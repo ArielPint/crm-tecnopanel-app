@@ -1,34 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { usePermisos } from '@/contexts/PermisosContext'
 
 const SUPABASE_URL = 'https://nivhygjllnbnyeyzsvth.supabase.co'
-
 const ROLES = ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'] as const
 type Rol = typeof ROLES[number]
-
 const ROL_LABEL: Record<Rol,string> = {
   admin:'Admin', gerente_ventas:'Gerente Ventas', vendedor:'Vendedor',
   jefe_ingenieria:'Jefe Ingeniería', cubicador:'Cubicador', analista_credito:'Analista Crédito'
 }
-
 const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Cubicación','Presupuestos','Crédito','Clientes','Usuarios']
-
-const PERMISOS: Record<string,Rol[]> = {
-  Dashboard: ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'],
-  Oportunidades: ['admin','gerente_ventas','vendedor','jefe_ingenieria'],
-  Ingeniería: ['admin','jefe_ingenieria'],
-  Cubicación: ['admin','cubicador'],
-  Presupuestos: ['admin','cubicador','analista_credito'],
-  Crédito: ['admin','analista_credito'],
-  Clientes: ['admin','gerente_ventas','vendedor'],
-  Usuarios: ['admin','gerente_ventas'],
-}
-
-interface Profile { id:string; nombre:string; apellido:string; email:string; rol:Rol; activo:boolean; created_at:string }
-
-interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:Rol }
-interface ModalEdit { id:string; nombre:string; apellido:string; rol:Rol }
+interface Profile{id:string;nombre:string;apellido:string;email:string;rol:Rol;activo:boolean;created_at:string}
+interface ModalCreate{nombre:string;apellido:string;email:string;password:string;rol:Rol}
+interface ModalEdit{id:string;nombre:string;apellido:string;rol:Rol}
 
 export default function Usuarios(){
   const [users,setUsers]=useState<Profile[]>([])
@@ -39,66 +24,63 @@ export default function Usuarios(){
   const [form,setForm]=useState<ModalCreate>({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'})
   const [saving,setSaving]=useState(false)
   const [error,setError]=useState<string|null>(null)
+  const {permisos,togglePermiso}=usePermisos()
+  const [toggling,setToggling]=useState<string|null>(null)
 
   async function load(){
     const {data}=await supabase.from('profiles').select('*').order('created_at',{ascending:false})
-    setUsers((data as Profile[])||[])
-    setLoading(false)
+    setUsers((data as Profile[])||[]);setLoading(false)
   }
   useEffect(()=>{load()},[])
 
   async function handleCreate(){
-    setSaving(true); setError(null)
+    setSaving(true);setError(null)
     try{
       const {data:{session}}=await supabase.auth.getSession()
       const res=await fetch(SUPABASE_URL+'/functions/v1/create-user',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+session?.access_token},
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session?.access_token},
         body:JSON.stringify(form),
       })
       const json=await res.json()
       if(!res.ok) throw new Error(json.error||'Error al crear usuario')
-      setCreating(false)
-      setForm({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'})
-      await load()
+      setCreating(false);setForm({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'});await load()
     }catch(e:unknown){setError(e instanceof Error?e.message:'Error desconocido')}
     setSaving(false)
   }
 
   async function handleEdit(){
     if(!editing) return
-    setSaving(true); setError(null)
+    setSaving(true);setError(null)
     const {error:err}=await supabase.from('profiles').update({nombre:editing.nombre,apellido:editing.apellido,rol:editing.rol}).eq('id',editing.id)
     if(err) setError(err.message)
-    else{ setEditing(null); await load() }
+    else{setEditing(null);await load()}
     setSaving(false)
   }
 
   async function toggleActivo(u:Profile){
-    await supabase.from('profiles').update({activo:!u.activo}).eq('id',u.id)
-    await load()
+    await supabase.from('profiles').update({activo:!u.activo}).eq('id',u.id);await load()
+  }
+
+  async function handleTogglePermiso(modulo:string,rol:string,current:boolean){
+    const key=modulo+'|'+rol
+    setToggling(key)
+    await togglePermiso(modulo,rol,current)
+    setToggling(null)
   }
 
   const ROL_BADGE:Record<Rol,string>={
-    admin:'bg-red-100 text-red-700',
-    gerente_ventas:'bg-purple-100 text-purple-700',
-    vendedor:'bg-blue-100 text-blue-700',
-    jefe_ingenieria:'bg-cyan-100 text-cyan-700',
-    cubicador:'bg-green-100 text-green-700',
-    analista_credito:'bg-amber-100 text-amber-700',
+    admin:'bg-red-100 text-red-700',gerente_ventas:'bg-purple-100 text-purple-700',vendedor:'bg-blue-100 text-blue-700',
+    jefe_ingenieria:'bg-cyan-100 text-cyan-700',cubicador:'bg-green-100 text-green-700',analista_credito:'bg-amber-100 text-amber-700',
   }
 
   if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
-
   return(
     <div className="flex flex-col h-full">
       <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
         <div><h1 className="text-lg font-bold text-gray-800">Usuarios</h1><p className="text-xs text-gray-500">{users.length} usuarios registrados</p></div>
         <button onClick={()=>{setCreating(true);setError(null)}} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo usuario</button>
       </div>
-
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Tabla usuarios */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -117,26 +99,25 @@ export default function Usuarios(){
                   <td className="px-4 py-3 text-gray-500">{u.email}</td>
                   <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium '+(ROL_BADGE[u.rol]??'bg-gray-100 text-gray-600')}>{ROL_LABEL[u.rol]??u.rol}</span></td>
                   <td className="px-4 py-3">{u.activo?<span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span>:<span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={()=>{setEditing({id:u.id,nombre:u.nombre,apellido:u.apellido,rol:u.rol});setError(null)}} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700" title="Editar"><Pencil size={14}/></button>
-                      <button onClick={()=>toggleActivo(u)} className={"p-1.5 rounded text-xs font-medium transition-colors "+(u.activo?'hover:bg-red-50 text-red-500':'hover:bg-green-50 text-green-600')} title={u.activo?'Desactivar':'Activar'}>{u.activo?<UserX size={14}/>:<UserCheck size={14}/>}</button>
-                    </div>
-                  </td>
+                  <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
+                    <button onClick={()=>{setEditing({id:u.id,nombre:u.nombre,apellido:u.apellido,rol:u.rol});setError(null)}} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
+                    <button onClick={()=>toggleActivo(u)} className={"p-1.5 rounded "+(u.activo?'hover:bg-red-50 text-red-500':'hover:bg-green-50 text-green-600')} title={u.activo?'Desactivar':'Activar'}>{u.activo?<UserX size={14}/>:<UserCheck size={14}/>}</button>
+                  </div></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Matriz permisos */}
+        {/* Matriz permisos editable */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <button onClick={()=>setShowPermisos(p=>!p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-            <span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span>
+            <div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span><span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Editable</span></div>
             {showPermisos?<ChevronUp size={16} className="text-gray-400"/>:<ChevronDown size={16} className="text-gray-400"/>}
           </button>
           {showPermisos&&(
             <div className="border-t border-gray-100 overflow-x-auto">
+              <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">Haz clic en una celda para activar o desactivar el acceso. Los cambios se guardan al instante.</p>
               <table className="w-full text-xs">
                 <thead className="bg-gray-50">
                   <tr>
@@ -148,11 +129,24 @@ export default function Usuarios(){
                   {MODULOS.map(m=>(
                     <tr key={m} className="hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium text-gray-700">{m}</td>
-                      {ROLES.map(r=>(
-                        <td key={r} className="px-3 py-2 text-center">
-                          {PERMISOS[m]?.includes(r)?<span className="inline-block w-4 h-4 bg-green-500 rounded-sm"/>:<span className="inline-block w-4 h-4 bg-gray-100 rounded-sm"/>}
-                        </td>
-                      ))}
+                      {ROLES.map(r=>{
+                        const row=permisos.find(p=>p.modulo===m&&p.rol===r)
+                        const val=row?.permitido??false
+                        const key=m+'|'+r
+                        const isToggling=toggling===key
+                        return(
+                          <td key={r} className="px-3 py-2 text-center">
+                            <button
+                              onClick={()=>handleTogglePermiso(m,r,val)}
+                              disabled={isToggling}
+                              title={val?'Quitar acceso a '+ROL_LABEL[r]:'Dar acceso a '+ROL_LABEL[r]}
+                              className={"w-6 h-6 rounded transition-all "+(isToggling?'opacity-50 cursor-wait ':(val?'bg-green-500 hover:bg-green-600':'bg-gray-100 hover:bg-gray-200'))}
+                            >
+                              {isToggling?<span className="block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"/>:(val?<span className="text-white text-[10px] font-bold">✓</span>:<span className="text-gray-300 text-[10px]">—</span>)}
+                            </button>
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))}
                 </tbody>
@@ -162,7 +156,6 @@ export default function Usuarios(){
         </div>
       </div>
 
-      {/* Modal Crear */}
       {creating&&(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -182,14 +175,12 @@ export default function Usuarios(){
               {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={()=>setCreating(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
-              <button onClick={handleCreate} disabled={saving||!form.nombre||!form.email||!form.password} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">{saving?'Creando...':'Crear usuario'}</button>
+              <button onClick={()=>setCreating(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleCreate} disabled={saving||!form.nombre||!form.email||!form.password} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Creando...':'Crear usuario'}</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Modal Editar */}
       {editing&&(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
@@ -207,8 +198,8 @@ export default function Usuarios(){
               {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={()=>setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
-              <button onClick={handleEdit} disabled={saving} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">{saving?'Guardando...':'Guardar cambios'}</button>
+              <button onClick={()=>setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleEdit} disabled={saving} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Guardando...':'Guardar cambios'}</button>
             </div>
           </div>
         </div>
