@@ -8,7 +8,7 @@ interface Result {
   codigo: string
   etapa_actual: string
   monto_estimado: number | null
-  cliente: { razon_social: string } | null
+  cliente: { razon_social: string } | { razon_social: string }[] | null
 }
 
 const ETAPA_DOT: Record<string, string> = {
@@ -91,9 +91,7 @@ export default function HeaderSearch() {
                   <p className="text-xs font-medium text-gray-800 truncate">{r.nombre}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] font-mono text-gray-400">{r.codigo}</span>
-                    {r.cliente && (
-                      <span className="text-[10px] text-gray-400 truncate">· {r.cliente.razon_social}</span>
-                    )}
+                    {r.cliente && (() => { const c = Array.isArray(r.cliente) ? r.cliente[0] : r.cliente; return c ? <span className="text-[10px] text-gray-400 truncate">· {c.razon_social}</span> : null })()}
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0 space-y-0.5">
