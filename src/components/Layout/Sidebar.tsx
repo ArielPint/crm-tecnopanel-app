@@ -39,7 +39,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 flex-shrink-0 bg-[#1a1a1b] flex flex-col h-full">
       <div className="px-5 py-5 border-b border-white/10">
-        <img src="/logo%20horizontal.jpeg" alt="TECNOPANEL" className="w-full object-contain max-h-10" />
+        <img src="/logo%20horizontal.jpeg" alt="TECNOPANEL" className="w-full object-contain" />
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">

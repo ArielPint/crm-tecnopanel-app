@@ -71,9 +71,9 @@ export default function Oportunidades() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-4">
-        <div><h1 className="text-lg font-bold text-gray-800">Oportunidades</h1><p className="text-xs text-gray-500">{filtradas.length} en curso</p></div>
-        <div className="flex-1 max-w-xs ml-4 relative">
+      <div className="px-6 py-3 border-b border-slate-200 bg-white flex items-center gap-4">
+        <p className="text-xs text-gray-500">{filtradas.length} en curso</p>
+        <div className="flex-1 max-w-xs ml-auto relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar..." className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
         </div>
@@ -82,37 +82,43 @@ export default function Oportunidades() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-4">
-        <div className="flex gap-3 h-full" style={{minWidth: ETAPAS.length * 220 + 'px'}}>
-          {ETAPAS.map(etapa => {
-            const cards = porEtapa(etapa)
-            return (
-              <div key={etapa} className="flex-shrink-0 w-52 flex flex-col">
-                <div className="flex items-center gap-2 mb-2 px-1">
-                  <span className="text-xs font-semibold text-gray-600 truncate">{etapa}</span>
-                  <span className="ml-auto text-xs bg-gray-200 text-gray-600 rounded-full px-2 py-0.5">{cards.length}</span>
-                </div>
-                <div className="flex-1 space-y-2 overflow-y-auto min-h-20">
-                  {cards.length === 0 ? (
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">Sin oportunidades</div>
-                  ) : cards.map(opp => (
-                    <div key={opp.id} onClick={() => setSelected(opp)}
-                      className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer">
-                      <div className="flex items-start justify-between gap-1 mb-1.5">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {ETAPAS.map(etapa => {
+          const cards = porEtapa(etapa)
+          if (cards.length === 0) return null
+          return (
+            <div key={etapa}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-semibold text-gray-700">{etapa}</span>
+                <span className="text-xs bg-slate-200 text-slate-600 rounded-full px-2 py-0.5">{cards.length}</span>
+              </div>
+              <div className="space-y-2">
+                {cards.map(opp => (
+                  <div key={opp.id} onClick={() => setSelected(opp)}
+                    className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-gray-400 font-mono">{opp.codigo}</span>
                         <span className={'text-xs px-1.5 py-0.5 rounded-full font-medium ' + TIPO_COLOR[opp.tipo_venta]}>{opp.tipo_venta}</span>
                       </div>
-                      <p className="text-sm font-semibold text-gray-800 leading-tight mb-1">{opp.nombre}</p>
-                      {opp.cliente && <p className="text-xs text-gray-500 truncate">{opp.cliente.razon_social}</p>}
-                      {opp.monto_estimado != null && <p className="text-xs font-medium mt-2 text-brand-red">{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>}
-                      <div className="mt-2 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full bg-green-400" style={{width:(opp.probabilidad??0)+'%'}} /></div>
+                      <p className="text-sm font-semibold text-gray-800 leading-tight">{opp.nombre}</p>
+                      {opp.cliente && <p className="text-xs text-gray-500 mt-0.5 truncate">{opp.cliente.razon_social}</p>}
                     </div>
-                  ))}
-                </div>
+                    <div className="text-right flex-shrink-0">
+                      {opp.monto_estimado != null && <p className="text-sm font-bold text-brand-red">{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>}
+                      <p className="text-xs text-gray-400 mt-0.5">{opp.probabilidad ?? 0}%</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )
+        })}
+        {filtradas.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+            <p className="text-sm">Sin oportunidades</p>
+          </div>
+        )}
       </div>
 
       {showForm && (

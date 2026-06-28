@@ -116,8 +116,8 @@ export default function Dashboard() {
             <div className={`w-10 h-10 rounded-lg ${k.iconBg} flex items-center justify-center flex-shrink-0`}>
               <k.icon size={18} className={k.iconColor} />
             </div>
-            <div className="min-w-0">
-              <p className={`text-2xl font-bold leading-none ${k.valueColor}`}>{k.value}</p>
+            <div className="min-w-0 overflow-hidden">
+              <p className={`text-xl font-bold leading-none truncate ${k.valueColor}`}>{k.value}</p>
               <p className="text-xs text-gray-400 mt-1.5 leading-tight">{k.label}</p>
             </div>
           </div>
