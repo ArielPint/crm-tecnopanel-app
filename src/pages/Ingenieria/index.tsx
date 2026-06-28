@@ -17,13 +17,13 @@ export default function Ingenieria() {
   const [selected, setSelected] = useState<Oportunidad|null>(null)
 
   async function load() {
-    const { data } = await supabase.from('oportunidades').select('*, cliente:clientes(razon_social), vendedor:profiles(nombre,apellido)').eq('etapa_actual', 'Ingenieria').order('updated_at',{ascending:false})
+    const { data } = await supabase.from('oportunidades').select('*, cliente:clientes(razon_social), vendedor:profiles(nombre,apellido)').eq('etapa_actual', 'Ingeniería').order('updated_at',{ascending:false})
     const base = (data as Oportunidad[]) || []
     if (!base.length) { setOpps([]); setLoading(false); return }
     const ids = base.map(o => o.id)
     const [{ data: asigs }, { data: hist }] = await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('oportunidad_id, usuario:profiles(nombre,apellido)').in('oportunidad_id', ids).eq('etapa', 'Ingenieria'),
-      supabase.from('oportunidad_historial_etapas').select('oportunidad_id, fecha_entrada').in('oportunidad_id', ids).eq('etapa', 'Ingenieria').is('fecha_salida', null),
+      supabase.from('oportunidad_asignaciones').select('oportunidad_id, usuario:profiles(nombre,apellido)').in('oportunidad_id', ids).eq('etapa', 'Ingeniería'),
+      supabase.from('oportunidad_historial_etapas').select('oportunidad_id, fecha_entrada').in('oportunidad_id', ids).eq('etapa', 'Ingeniería').is('fecha_salida', null),
     ])
     const am: Record<string,{nombre:string;apellido:string}> = {}
     const dm: Record<string,number> = {}
