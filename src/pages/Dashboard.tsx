@@ -1,179 +1,358 @@
 import { useEffect, useState } from 'react'
-import { Briefcase, TrendingUp, CheckCircle2, DollarSign, Clock } from 'lucide-react'
+import { Briefcase, Target, CheckCircle2, TrendingUp, Clock, ArrowUpRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Oportunidad, OportunidadHistorialEtapa } from '@/types/database'
-
-interface Stats { total: number; activas: number; ganadas: number; monto: number }
 
 const ETAPAS = [
   'Clasificación','Ingeniería','Cubicación','Presupuestos',
   'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
 ]
 
-const ETAPA_COLORS = [
-  '#fca5a5','#f87171','#ef4444','#dc2626','#c0241a','#a31c13','#ed3224'
-]
+const ETAPA_COLORS: Record<string, string> = {
+  'Clasificación':        '#64748b',
+  'Ingeniería':           '#3b82f6',
+  'Cubicación':           '#8b5cf6',
+  'Presupuestos':         '#f97316',
+  'Revisión Vendedor':    '#f59e0b',
+  'Revisión Cliente':     '#fb923c',
+  'Evaluación Crediticia':'#ef4444',
+}
 
-function formatCLP(n: number) {
+const TIPO_COLOR: Record<string,string> = {
+  Proyecto: 'bg-purple-100 text-purple-700',
+  Producto: 'bg-blue-100 text-blue-700',
+  Kit: 'bg-amber-100 text-amber-700',
+}
+
+interface Notif {
+  id: string
+  tipo: string
+  titulo: string
+  mensaje: string | null
+  created_at: string
+}
+
+function fmtCLP(n: number) {
+  if (n >= 1_000_000_000) return '$' + (n / 1_000_000_000).toFixed(1) + 'B'
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(0) + 'M'
+  if (n >= 1_000) return '$' + (n / 1_000).toFixed(0) + 'K'
+  return '$' + n.toLocaleString('es-CL')
+}
+
+function fmtFull(n: number) {
   return '$' + n.toLocaleString('es-CL')
 }
 
 function diffDias(from: string, to: string | null) {
-  const ms = (to ? new Date(to) : new Date()).getTime() - new Date(from).getTime()
-  return Math.max(0, Math.floor(ms / 86400000))
+  return Math.max(0, Math.floor(((to ? new Date(to) : new Date()).getTime() - new Date(from).getTime()) / 86400000))
 }
 
-const STAT_CARDS = (s: Stats, loading: boolean) => [
-  {
-    label: 'Total oportunidades',
-    value: loading ? '-' : String(s.total),
-    icon: Briefcase,
-    iconBg: 'bg-slate-100',
-    iconColor: 'text-slate-500',
-    valueColor: 'text-gray-800',
-  },
-  {
-    label: 'En curso',
-    value: loading ? '-' : String(s.activas),
-    icon: TrendingUp,
-    iconBg: 'bg-red-50',
-    iconColor: 'text-red-500',
-    valueColor: 'text-red-600',
-  },
-  {
-    label: 'Ganadas',
-    value: loading ? '-' : String(s.ganadas),
-    icon: CheckCircle2,
-    iconBg: 'bg-emerald-50',
-    iconColor: 'text-emerald-500',
-    valueColor: 'text-emerald-600',
-  },
-  {
-    label: 'Monto estimado',
-    value: loading ? '-' : formatCLP(s.monto),
-    icon: DollarSign,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-500',
-    valueColor: 'text-blue-600',
-  },
-]
+function tiempoRel(date: string) {
+  const diff = Date.now() - new Date(date).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 60) return `hace ${min}m`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `hace ${h}h`
+  const d = Math.floor(h / 24)
+  return d === 1 ? 'ayer' : `hace ${d}d`
+}
+
+const NOTIF_ICON: Record<string, string> = {
+  oportunidad_nueva: '📋',
+  etapa_cambio: '→',
+  asignacion: '👤',
+  estado_final: '✓',
+}
 
 export default function Dashboard() {
   const { profile } = useAuth()
-  const [stats, setStats] = useState<Stats>({ total: 0, activas: 0, ganadas: 0, monto: 0 })
-  const [funnel, setFunnel] = useState<Record<string, number>>({})
-  const [avgDias, setAvgDias] = useState<Record<string, number>>({})
+  const [opps, setOpps] = useState<Oportunidad[]>([])
+  const [hist, setHist] = useState<OportunidadHistorialEtapa[]>([])
+  const [notifs, setNotifs] = useState<Notif[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [{ data: rawData }, { data: histData }] = await Promise.all([
-        supabase.from('oportunidades').select('*'),
+      const [{ data: rawOpps }, { data: rawHist }, { data: rawNotifs }] = await Promise.all([
+        supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)'),
         supabase.from('oportunidad_historial_etapas').select('*'),
+        supabase.from('notifications').select('id,tipo,titulo,mensaje,created_at').order('created_at',{ascending:false}).limit(10),
       ])
-      const data = (rawData as Oportunidad[]) || []
-      const hist = (histData as OportunidadHistorialEtapa[]) || []
-
-      const total = data.length
-      const ganadas = data.filter(o => o.etapa_actual === 'Ganado').length
-      const activas = data.filter(o => !['Ganado','Perdido'].includes(o.etapa_actual)).length
-      const monto = data.reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
-      setStats({ total, activas, ganadas, monto })
-
-      const f: Record<string, number> = {}
-      ETAPAS.forEach(e => { f[e] = data.filter(o => o.etapa_actual === e).length })
-      setFunnel(f)
-
-      const diasPorEtapa: Record<string, number[]> = {}
-      hist.forEach(h => {
-        const dias = diffDias(h.fecha_entrada, h.fecha_salida)
-        if (!diasPorEtapa[h.etapa]) diasPorEtapa[h.etapa] = []
-        diasPorEtapa[h.etapa].push(dias)
-      })
-      const avg: Record<string, number> = {}
-      Object.entries(diasPorEtapa).forEach(([etapa, values]) => {
-        avg[etapa] = Math.round(values.reduce((a, b) => a + b, 0) / values.length)
-      })
-      setAvgDias(avg)
+      setOpps((rawOpps as Oportunidad[]) ?? [])
+      setHist((rawHist as OportunidadHistorialEtapa[]) ?? [])
+      setNotifs((rawNotifs as Notif[]) ?? [])
       setLoading(false)
     }
     load()
   }, [])
 
-  const maxFunnel = Math.max(...Object.values(funnel), 1)
+  /* ── Stats ── */
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+  const activas = opps.filter(o => !['Ganado','Perdido'].includes(o.etapa_actual))
+  const pipelineMonto = activas.reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+  const pipelineLastMonth = opps
+    .filter(o => !['Ganado','Perdido'].includes(o.etapa_actual) && new Date(o.created_at) < startOfMonth && new Date(o.created_at) >= startOfLastMonth)
+    .reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+  const pipelineTrend = pipelineLastMonth > 0 ? Math.round(((pipelineMonto - pipelineLastMonth) / pipelineLastMonth) * 100) : null
+
+  const ganadasMes = opps.filter(o => o.etapa_actual === 'Ganado' && new Date(o.updated_at) >= startOfMonth)
+  const ganadasMesMonto = ganadasMes.reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+
+  const ganadas = opps.filter(o => o.etapa_actual === 'Ganado')
+  const perdidas = opps.filter(o => o.etapa_actual === 'Perdido')
+  const tasaConv = (ganadas.length + perdidas.length) > 0
+    ? Math.round(ganadas.length / (ganadas.length + perdidas.length) * 100)
+    : 0
+
+  /* ── Pipeline por etapa (monto + count) ── */
+  const montoByEtapa: Record<string, number> = {}
+  const countByEtapa: Record<string, number> = {}
+  ETAPAS.forEach(e => {
+    const subset = activas.filter(o => o.etapa_actual === e)
+    countByEtapa[e] = subset.length
+    montoByEtapa[e] = subset.reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+  })
+  const maxMonto = Math.max(...Object.values(montoByEtapa), 1)
+
+  /* ── Tiempo promedio por etapa ── */
+  const diasPorEtapa: Record<string, number[]> = {}
+  hist.forEach(h => {
+    const d = diffDias(h.fecha_entrada, h.fecha_salida)
+    if (!diasPorEtapa[h.etapa]) diasPorEtapa[h.etapa] = []
+    diasPorEtapa[h.etapa].push(d)
+  })
+  const avgDias: Record<string, number> = {}
+  Object.entries(diasPorEtapa).forEach(([e, vals]) => {
+    avgDias[e] = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+  })
+
+  /* ── Actividad reciente: notificaciones + historial como fallback ── */
+  const actReciente = notifs.length >= 3 ? notifs : [
+    ...notifs,
+    ...hist
+      .filter(h => ['Ganado','Perdido'].includes(h.etapa) || true)
+      .sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
+      .slice(0, 8 - notifs.length)
+      .map(h => ({
+        id: h.id,
+        tipo: 'etapa_cambio',
+        titulo: `Movimiento a ${h.etapa}`,
+        mensaje: null,
+        created_at: h.fecha_entrada,
+      })),
+  ].slice(0, 8)
+
+  /* ── Oportunidades recientes ── */
+  const oppsRecientes = [...opps]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 5)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-5">
       <p className="text-sm text-gray-500">
-        Bienvenido, <span className="font-medium text-gray-700">{profile?.nombre}</span>
+        Bienvenido, <span className="font-semibold text-gray-700">{profile?.nombre} {profile?.apellido}</span>
       </p>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STAT_CARDS(stats, loading).map(k => (
-          <div key={k.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-start gap-4">
-            <div className={`w-10 h-10 rounded-lg ${k.iconBg} flex items-center justify-center flex-shrink-0`}>
-              <k.icon size={18} className={k.iconColor} />
-            </div>
-            <div className="min-w-0 overflow-hidden">
-              <p className={`text-xl font-bold leading-none truncate ${k.valueColor}`}>{k.value}</p>
-              <p className="text-xs text-gray-400 mt-1.5 leading-tight">{k.label}</p>
+        {/* Pipeline total */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Pipeline Total</p>
+            <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Briefcase size={16} className="text-slate-500" />
             </div>
           </div>
-        ))}
+          <p className="text-2xl font-bold text-gray-800 truncate">{fmtCLP(pipelineMonto)}</p>
+          {pipelineTrend !== null ? (
+            <p className={`text-xs mt-1.5 flex items-center gap-0.5 ${pipelineTrend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              <ArrowUpRight size={11} className={pipelineTrend < 0 ? 'rotate-180' : ''} />
+              {Math.abs(pipelineTrend)}% vs mes anterior
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1.5">Monto en pipeline activo</p>
+          )}
+        </div>
+
+        {/* Oport. activas */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Oport. Activas</p>
+            <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Target size={16} className="text-red-500" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{activas.length}</p>
+          <p className="text-xs text-gray-400 mt-1.5">En pipeline activo</p>
+        </div>
+
+        {/* Ganados mes */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ganados (mes)</p>
+            <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 size={16} className="text-emerald-500" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{ganadasMesMonto > 0 ? fmtCLP(ganadasMesMonto) : ganadasMes.length}</p>
+          <p className="text-xs text-emerald-600 mt-1.5">{ganadasMes.length} oportunidad{ganadasMes.length !== 1 ? 'es' : ''} cerrada{ganadasMes.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Tasa conversión */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-start justify-between mb-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Tasa Conversión</p>
+            <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+              <TrendingUp size={16} className="text-blue-500" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{tasaConv}%</p>
+          <p className="text-xs text-gray-400 mt-1.5">Ganadas vs cerradas totales</p>
+        </div>
       </div>
 
-      {/* Pipeline */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-5">Pipeline por etapa</h2>
-        {loading ? (
-          <div className="space-y-3">
-            {ETAPAS.map(e => (
-              <div key={e} className="flex items-center gap-3">
-                <div className="w-44 h-3 bg-slate-100 rounded animate-pulse" />
-                <div className="flex-1 h-5 bg-slate-100 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {ETAPAS.map((etapa, i) => (
+      {/* Pipeline + Actividad reciente */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Pipeline por etapa */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-5">Pipeline por Etapa</h2>
+          <div className="space-y-3.5">
+            {ETAPAS.map(etapa => (
               <div key={etapa} className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-44 truncate">{etapa}</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+                <span className="text-xs text-gray-500 w-24 sm:w-40 truncate flex-shrink-0">{etapa}</span>
+                <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
                   <div
-                    className="h-5 rounded-full transition-all duration-700"
+                    className="h-4 rounded-full transition-all duration-700"
                     style={{
-                      width: `${Math.max((funnel[etapa] ?? 0) / maxFunnel * 100, funnel[etapa] ? 6 : 0)}%`,
-                      background: ETAPA_COLORS[i],
+                      width: `${Math.max((montoByEtapa[etapa] ?? 0) / maxMonto * 100, montoByEtapa[etapa] ? 4 : 0)}%`,
+                      background: ETAPA_COLORS[etapa] ?? '#64748b',
                     }}
                   />
                 </div>
-                <span className="text-xs font-bold text-gray-600 w-5 text-right">{funnel[etapa] ?? 0}</span>
+                <span className="text-xs font-semibold text-gray-700 w-20 text-right flex-shrink-0">
+                  {fmtCLP(montoByEtapa[etapa] ?? 0)}
+                </span>
+                <span className="text-xs text-gray-400 w-4 text-right flex-shrink-0">
+                  {countByEtapa[etapa] ?? 0}
+                </span>
                 {avgDias[etapa] !== undefined && (
-                  <span className="text-xs text-gray-400 w-16 text-right">{avgDias[etapa]}d prom.</span>
+                  <span className="text-xs text-gray-300 w-14 text-right flex-shrink-0 hidden xl:block">
+                    {avgDias[etapa]}d prom.
+                  </span>
                 )}
               </div>
             ))}
           </div>
-        )}
+        </div>
+
+        {/* Actividad reciente */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Actividad Reciente</h2>
+          {actReciente.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-8">Sin actividad reciente</p>
+          ) : (
+            <div className="space-y-1">
+              {actReciente.map(n => (
+                <div key={n.id} className="flex gap-2.5 py-2.5 border-b border-slate-50 last:border-0">
+                  <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                    {NOTIF_ICON[n.tipo] ?? '📌'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-700 leading-snug">{n.titulo}</p>
+                    {n.mensaje && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{n.mensaje}</p>}
+                    <p className="text-[10px] text-gray-300 mt-0.5">{tiempoRel(n.created_at)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tiempo promedio */}
-      {!loading && Object.keys(avgDias).length > 0 && (
+      {/* Tiempo promedio por etapa */}
+      {Object.keys(avgDias).length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-5">
             <Clock size={15} className="text-gray-400" />
             <h2 className="text-sm font-semibold text-gray-700">Tiempo promedio por etapa (días)</h2>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {ETAPAS.map((etapa, i) => avgDias[etapa] !== undefined && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            {ETAPAS.map(etapa => avgDias[etapa] !== undefined && (
               <div key={etapa} className="rounded-lg p-4 text-center bg-slate-50 border border-slate-200">
-                <p className="text-2xl font-bold" style={{ color: ETAPA_COLORS[i] }}>{avgDias[etapa]}</p>
+                <p className="text-2xl font-bold" style={{ color: ETAPA_COLORS[etapa] }}>{avgDias[etapa]}</p>
                 <p className="text-[11px] text-gray-400 mt-1 leading-tight">{etapa}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Oportunidades recientes */}
+      {oppsRecientes.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">Oportunidades Recientes</h2>
+            <a href="/oportunidades" className="text-xs text-brand-red hover:underline font-medium">Ver todas →</a>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left px-6 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Oportunidad</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Cliente</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Tipo</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Etapa</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Importe / Prob.</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {oppsRecientes.map(o => (
+                  <tr key={o.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-3.5">
+                      <p className="text-sm font-medium text-gray-800 truncate max-w-[180px]">{o.nombre}</p>
+                      <p className="text-[11px] text-gray-400 font-mono">{o.codigo}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-gray-600 truncate max-w-[140px]">
+                      {o.cliente ? (o.cliente as { razon_social: string }).razon_social : '—'}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${TIPO_COLOR[o.tipo_venta] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {o.tipo_venta}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-medium text-white"
+                        style={{ background: ETAPA_COLORS[o.etapa_actual] ?? '#64748b' }}>
+                        {o.etapa_actual}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      {o.monto_estimado != null && (
+                        <p className="text-sm font-bold text-gray-700">{fmtFull(o.monto_estimado)}</p>
+                      )}
+                      <div className="flex items-center justify-end gap-2 mt-1">
+                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-brand-red" style={{ width: `${o.probabilidad}%` }} />
+                        </div>
+                        <span className="text-[11px] text-gray-400">{o.probabilidad}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -110,42 +110,72 @@ export default function Usuarios() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
+      <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between gap-3">
         <div><h1 className="text-lg font-bold text-gray-800">Usuarios</h1><p className="text-xs text-gray-500">{users.length} usuarios registrados</p></div>
-        <button onClick={() => { setCreating(true); setError(null) }} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo usuario</button>
+        <button onClick={() => { setCreating(true); setError(null) }} className="flex items-center gap-2 px-3 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex-shrink-0"><Plus size={16}/><span className="hidden sm:inline">Nuevo usuario</span><span className="sm:hidden">Nuevo</span></button>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Tabla de usuarios */}
+      <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+        {/* Usuarios — tabla en desktop, cards en móvil */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Usuario</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Rol</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.map(u => {
-                const meta = ROL_META[u.rol as Rol]
-                return (
-                  <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
-                    <td className="px-4 py-3 text-gray-500">{u.email}</td>
-                    <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span></td>
-                    <td className="px-4 py-3">{u.activo ? <span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span> : <span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
-                    <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
-                      <button onClick={() => toggleActivo(u)} className={'p-1.5 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')} title={u.activo ? 'Desactivar' : 'Activar'}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
-                    </div></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Usuario</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Rol</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {users.map(u => {
+                  const meta = ROL_META[u.rol as Rol]
+                  return (
+                    <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
+                      <td className="px-4 py-3 text-gray-500">{u.email}</td>
+                      <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span></td>
+                      <td className="px-4 py-3">{u.activo ? <span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span> : <span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
+                      <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
+                        <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
+                        <button onClick={() => toggleActivo(u)} className={'p-1.5 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')} title={u.activo ? 'Desactivar' : 'Activar'}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
+                      </div></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {users.map(u => {
+              const meta = ROL_META[u.rol as Rol]
+              return (
+                <div key={u.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-brand-red flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {u.nombre[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{u.nombre} {u.apellido}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={'text-[11px] px-2 py-0.5 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span>
+                      {u.activo
+                        ? <span className="flex items-center gap-0.5 text-green-600 text-[11px]"><UserCheck size={11}/>Activo</span>
+                        : <span className="flex items-center gap-0.5 text-gray-400 text-[11px]"><UserX size={11}/>Inactivo</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-2 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14}/></button>
+                    <button onClick={() => toggleActivo(u)} className={'p-2 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* Tabla de Roles del sistema */}
@@ -259,7 +289,7 @@ export default function Usuarios() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Nuevo usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
@@ -286,7 +316,7 @@ export default function Usuarios() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Editar usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e => setEditing(ed => ed ? { ...ed, nombre: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e => setEditing(ed => ed ? { ...ed, apellido: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>

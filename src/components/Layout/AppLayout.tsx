@@ -1,32 +1,55 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import { Plus, Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
-
-const TITLES: Record<string, string> = {
-  '/dashboard':    'Dashboard',
-  '/oportunidades':'Oportunidades',
-  '/ingenieria':   'Ingeniería',
-  '/cubicacion':   'Cubicación',
-  '/presupuestos': 'Presupuestos',
-  '/credito':      'Crédito',
-  '/clientes':     'Clientes',
-  '/usuarios':     'Usuarios',
-}
+import HeaderSearch from '@/components/HeaderSearch'
+import NotificationsBell from '@/components/NotificationsBell'
+import NuevaOportunidadModal from '@/components/NuevaOportunidadModal'
+import { useGlobalModals } from '@/contexts/GlobalModalsContext'
 
 export function AppLayout() {
-  const { pathname } = useLocation()
-  const title = TITLES[pathname] ?? ''
+  const { showNuevaOpp, openNuevaOpp, closeNuevaOpp } = useGlobalModals()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 flex-shrink-0 shadow-sm">
-          <h1 className="text-base font-semibold text-gray-800">{title}</h1>
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-3 flex-shrink-0 shadow-sm">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg flex-shrink-0"
+            aria-label="Abrir menú"
+          >
+            <Menu size={18} />
+          </button>
+
+          <HeaderSearch />
+
+          <div className="flex items-center gap-2 ml-auto">
+            <NotificationsBell />
+            <button
+              onClick={openNuevaOpp}
+              className="flex items-center gap-1.5 bg-brand-red hover:bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+            >
+              <Plus size={15} />
+              <span className="hidden sm:inline">Nueva Oportunidad</span>
+              <span className="sm:hidden">Nueva</span>
+            </button>
+          </div>
         </header>
+
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
+
+      <NuevaOportunidadModal
+        isOpen={showNuevaOpp}
+        onClose={closeNuevaOpp}
+        onSuccess={closeNuevaOpp}
+      />
     </div>
   )
 }

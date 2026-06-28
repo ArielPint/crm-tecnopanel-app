@@ -183,11 +183,11 @@ export default function Clientes() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between gap-4">
+      <div className="px-4 md:px-6 py-4 border-b border-gray-200 bg-white flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div><h1 className="text-lg font-bold text-gray-800">Clientes</h1><p className="text-xs text-gray-500">{clientes.length} clientes registrados</p></div>
-        <div className="flex items-center gap-3">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-brand-red"/>
-          <button onClick={openNewCliente} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo cliente</button>
+        <div className="flex items-center gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="flex-1 sm:w-52 sm:flex-none border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/>
+          <button onClick={openNewCliente} className="flex items-center gap-2 px-3 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex-shrink-0"><Plus size={16}/><span className="hidden sm:inline">Nuevo cliente</span><span className="sm:hidden">Nuevo</span></button>
         </div>
       </div>
 
@@ -325,8 +325,8 @@ export default function Clientes() {
               <button onClick={() => { setEditCliente(null); setNewCliente(false) }} className="p-1.5 rounded hover:bg-gray-100"><X size={16}/></button>
             </div>
             <div className="px-6 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Razón Social *</label><input value={clienteForm.razon_social} onChange={e => setClienteForm(f => ({ ...f, razon_social: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Razón Social *</label><input value={clienteForm.razon_social} onChange={e => setClienteForm(f => ({ ...f, razon_social: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">RUT</label><input value={clienteForm.rut} onChange={e => setClienteForm(f => ({ ...f, rut: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Tipo</label>
                   <select value={clienteForm.tipo} onChange={e => setClienteForm(f => ({ ...f, tipo: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
@@ -335,11 +335,11 @@ export default function Clientes() {
                 </div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Rubro</label><input value={clienteForm.rubro} onChange={e => setClienteForm(f => ({ ...f, rubro: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Ciudad</label><input value={clienteForm.ciudad} onChange={e => setClienteForm(f => ({ ...f, ciudad: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
-                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Dirección</label><input value={clienteForm.direccion} onChange={e => setClienteForm(f => ({ ...f, direccion: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div className="sm:col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Dirección</label><input value={clienteForm.direccion} onChange={e => setClienteForm(f => ({ ...f, direccion: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1">Contacto principal</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={clienteForm.contacto_nombre} onChange={e => setClienteForm(f => ({ ...f, contacto_nombre: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={clienteForm.contacto_nombre} onChange={e => setClienteForm(f => ({ ...f, contacto_nombre: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input value={clienteForm.contacto_email} onChange={e => setClienteForm(f => ({ ...f, contacto_email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Teléfono</label><input value={clienteForm.contacto_fono} onChange={e => setClienteForm(f => ({ ...f, contacto_fono: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
@@ -363,7 +363,7 @@ export default function Clientes() {
             </div>
             <div className="px-6 py-4 space-y-3">
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre *</label><input value={contactoForm.nombre} onChange={e => setContactoForm(f => ({ ...f, nombre: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Cargo</label><input value={contactoForm.cargo} onChange={e => setContactoForm(f => ({ ...f, cargo: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
                 <div><label className="text-xs font-medium text-gray-600 block mb-1">Teléfono</label><input value={contactoForm.fono} onChange={e => setContactoForm(f => ({ ...f, fono: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>

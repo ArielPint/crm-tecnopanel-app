@@ -36,7 +36,7 @@ export default function Presupuestos(){
   if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
   return(
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         <p className="text-xs text-gray-500 mb-4">{opps.length} oportunidades</p>
         {opps.length===0?(<div className="flex flex-col items-center justify-center h-64 text-gray-400"><p className="text-sm">Sin oportunidades en esta etapa</p></div>):(
           <div className="space-y-3 max-w-3xl">{opps.map(o=>(
