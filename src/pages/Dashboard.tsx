@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, Briefcase, CheckCircle, DollarSign } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import type { EtapaOportunidad } from '@/types/database'
+import type { Oportunidad } from '@/types/database'
 
 interface Stats {
   total: number
@@ -11,9 +10,9 @@ interface Stats {
   monto: number
 }
 
-const ETAPAS: EtapaOportunidad[] = [
-  'Clasificación','Ingeniería','Cubicación','Presupuestos',
-  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
+const ETAPAS = [
+  'Clasificacion','Ingenieria','Cubicacion','Presupuestos',
+  'Revision Vendedor','Revision Cliente','Evaluacion Crediticia',
 ]
 
 export default function Dashboard() {
@@ -24,14 +23,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('oportunidades').select('*')
+      const { data: rawData } = await supabase.from('oportunidades').select('*')
+      const data = rawData as Oportunidad[] | null
       if (!data) return
       const total   = data.length
       const ganadas = data.filter(o => o.etapa_actual === 'Ganado').length
       const activas = data.filter(o => !['Ganado','Perdido'].includes(o.etapa_actual)).length
       const monto   = data.reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
       setStats({ total, activas, ganadas, monto })
-
       const f: Record<string, number> = {}
       ETAPAS.forEach(e => { f[e] = data.filter(o => o.etapa_actual === e).length })
       setFunnel(f)
@@ -53,11 +52,8 @@ export default function Dashboard() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
-        <p className="text-sm text-gray-500">
-          Bienvenido, {profile?.nombre}
-        </p>
+        <p className="text-sm text-gray-500">Bienvenido, {profile?.nombre}</p>
       </div>
-
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map(k => (
           <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-4">
@@ -66,7 +62,6 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
-
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Pipeline por etapa</h2>
         {loading ? (
@@ -77,14 +72,10 @@ export default function Dashboard() {
               <div key={etapa} className="flex items-center gap-3">
                 <span className="text-xs text-gray-500 w-40 truncate">{etapa}</span>
                 <div className="flex-1 bg-gray-100 rounded-full h-5">
-                  <div
-                    className="h-5 rounded-full"
-                    style={{ width: ((funnel[etapa] ?? 0) / maxFunnel * 100) + '%', background: '#ed3224' }}
-                  />
+                  <div className="h-5 rounded-full"
+                    style={{ width: ((funnel[etapa] ?? 0) / maxFunnel * 100) + '%', background: '#ed3224' }} />
                 </div>
-                <span className="text-xs font-medium text-gray-700 w-5 text-right">
-                  {funnel[etapa] ?? 0}
-                </span>
+                <span className="text-xs font-medium text-gray-700 w-5 text-right">{funnel[etapa] ?? 0}</span>
               </div>
             ))}
           </div>
