@@ -17,12 +17,17 @@ export default function Credito(){
     if(!base.length){setOpps([]);setLoading(false);return}
     const ids=base.map(o=>o.id)
     const [{data:asigs},{data:hist}]=await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario:profiles(nombre,apellido)').in('oportunidad_id',ids).eq('etapa','Evaluación Crediticia'),
+      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario_id').in('oportunidad_id',ids).eq('etapa','Evaluación Crediticia'),
       supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Evaluación Crediticia').is('fecha_salida',null),
     ])
     const am:Record<string,{nombre:string;apellido:string}>={};const dm:Record<string,number>={}
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(asigs||[]).forEach((a:any)=>{const u=Array.isArray(a.usuario)?a.usuario[0]:a.usuario;if(u)am[a.oportunidad_id]=u})
+    const userIds=[...new Set((asigs||[]).map((a:any)=>a.usuario_id).filter(Boolean))]
+    if(userIds.length){
+      const {data:users}=await supabase.from('profiles').select('id,nombre,apellido').in('id',userIds)
+      const um:Record<string,{nombre:string;apellido:string}>=Object.fromEntries((users||[]).map(u=>[u.id,u]))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(asigs||[]).forEach((a:any)=>{if(um[a.usuario_id])am[a.oportunidad_id]=um[a.usuario_id]})
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(hist||[]).forEach((h:any)=>{dm[h.oportunidad_id]=Math.floor((Date.now()-new Date(h.fecha_entrada).getTime())/86400000)})
     setOpps(base.map(o=>({...o,asignado:am[o.id]??null,dias:dm[o.id]??0})));setLoading(false)
