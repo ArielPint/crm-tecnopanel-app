@@ -6,8 +6,8 @@ import type { Oportunidad, EtapaOportunidad, TipoVenta } from '@/types/database'
 import OportunidadDrawer from '@/components/OportunidadDrawer'
 
 const ETAPAS: EtapaOportunidad[] = [
-  'Clasificacion','Ingenieria','Cubicacion','Presupuestos',
-  'Revision Vendedor','Revision Cliente','Evaluacion Crediticia',
+  'Clasificación','Ingeniería','Cubicación','Presupuestos',
+  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
 ]
 
 const TIPO_COLOR: Record<TipoVenta, string> = {
@@ -22,7 +22,7 @@ interface FormData {
   monto_estimado: string; probabilidad: string; etapa_actual: EtapaOportunidad;
   fecha_cierre_est: string; descripcion: string;
 }
-const FORM_INIT: FormData = { nombre:'', cliente_id:'', tipo_venta:'Proyecto', monto_estimado:'', probabilidad:'50', etapa_actual:'Clasificacion', fecha_cierre_est:'', descripcion:'' }
+const FORM_INIT: FormData = { nombre:'', cliente_id:'', tipo_venta:'Proyecto', monto_estimado:'', probabilidad:'50', etapa_actual:'Clasificación', fecha_cierre_est:'', descripcion:'' }
 function genCodigo() { const d = new Date(); return 'OPP-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'-'+Math.floor(Math.random()*9000+1000) }
 
 export default function Oportunidades() {
