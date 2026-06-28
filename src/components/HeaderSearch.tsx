@@ -45,7 +45,7 @@ export default function HeaderSearch() {
         .select('id,nombre,codigo,etapa_actual,monto_estimado,cliente:clientes(razon_social)')
         .or(`nombre.ilike.%${trimmed}%,codigo.ilike.%${trimmed}%`)
         .limit(7)
-      setResults((data as Result[]) ?? [])
+      setResults((data as unknown as Result[]) ?? [])
       setOpen(true)
       setLoading(false)
     }, 280)
