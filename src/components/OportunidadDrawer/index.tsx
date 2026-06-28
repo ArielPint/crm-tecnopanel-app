@@ -162,8 +162,19 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     setUploading(false)
   }
 
+  function isSafeUrl(url: string): boolean {
+    try {
+      const { protocol } = new URL(url)
+      return protocol === 'https:' || protocol === 'http:'
+    } catch { return false }
+  }
+
   async function addLink() {
     if (!linkUrl.trim()) return
+    if (!isSafeUrl(linkUrl.trim())) {
+      alert('Solo se permiten URLs http o https.')
+      return
+    }
     await supabase.from('oportunidad_documentos').insert({
       oportunidad_id: opp.id, nombre: linkNombre.trim() || linkUrl.trim(),
       tipo: 'link', url: linkUrl.trim(), subido_por: profile?.id, etapa: opp.etapa_actual,
@@ -178,7 +189,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   }
 
   async function openFile(tipo: string, url: string) {
-    if (tipo === 'link') { window.open(url, '_blank'); return }
+    if (tipo === 'link') {
+      if (!isSafeUrl(url)) return
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
     const { data } = await supabase.storage.from('oportunidades').createSignedUrl(url, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }

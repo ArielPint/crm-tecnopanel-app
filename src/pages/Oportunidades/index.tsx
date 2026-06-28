@@ -23,7 +23,7 @@ interface FormData {
   fecha_cierre_est: string; descripcion: string;
 }
 const FORM_INIT: FormData = { nombre:'', cliente_id:'', tipo_venta:'Proyecto', monto_estimado:'', probabilidad:'50', etapa_actual:'Clasificación', fecha_cierre_est:'', descripcion:'' }
-function genCodigo() { const d = new Date(); return 'OPP-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'-'+Math.floor(Math.random()*9000+1000) }
+function genCodigo() { const d = new Date(); const rand = crypto.getRandomValues(new Uint16Array(1))[0] % 9000 + 1000; return 'OPP-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'-'+rand }
 
 export default function Oportunidades() {
   const { profile } = useAuth()

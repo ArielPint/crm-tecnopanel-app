@@ -6,13 +6,25 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [attempts, setAttempts] = useState(0)
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (lockedUntil && Date.now() < lockedUntil) {
+      setError(`Demasiados intentos. Esperá ${Math.ceil((lockedUntil - Date.now()) / 1000)} segundos.`)
+      return
+    }
     setLoading(true)
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false) }
+    if (error) {
+      const next = attempts + 1
+      setAttempts(next)
+      if (next >= 5) setLockedUntil(Date.now() + 30_000)
+      setError('Correo o contraseña incorrectos.')
+      setLoading(false)
+    }
   }
 
   return (

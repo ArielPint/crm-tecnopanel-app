@@ -3,7 +3,7 @@ import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp } from 'lucide-r
 import { supabase } from '@/lib/supabase'
 import { usePermisos } from '@/contexts/PermisosContext'
 
-const SUPABASE_URL = 'https://nivhygjllnbnyeyzsvth.supabase.co'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 const ROLES = ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'] as const
 type Rol = typeof ROLES[number]
 const ROL_LABEL: Record<Rol,string> = {
