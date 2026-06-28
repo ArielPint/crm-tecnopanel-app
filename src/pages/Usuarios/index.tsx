@@ -1,35 +1,218 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-interface Profile { id:string;nombre:string;apellido:string;email:string;rol:string;activo:boolean }
-const RC:Record<string,string> = { admin:'bg-red-100 text-red-700',gerente_general:'bg-purple-100 text-purple-700',gerente_ventas:'bg-blue-100 text-blue-700',vendedor:'bg-sky-100 text-sky-700',jefe_ingenieria:'bg-amber-100 text-amber-700',ingeniero:'bg-yellow-100 text-yellow-700',cubicador:'bg-emerald-100 text-emerald-700',presupuestista:'bg-teal-100 text-teal-700',finanzas:'bg-indigo-100 text-indigo-700' }
+const SUPABASE_URL = 'https://nivhygjllnbnyeyzsvth.supabase.co'
 
-export default function Usuarios() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => { supabase.from('profiles').select('*').order('nombre').then(({ data }) => { setProfiles((data as Profile[])||[]); setLoading(false) }) }, [])
-  if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
-  return (
+const ROLES = ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'] as const
+type Rol = typeof ROLES[number]
+
+const ROL_LABEL: Record<Rol,string> = {
+  admin:'Admin', gerente_ventas:'Gerente Ventas', vendedor:'Vendedor',
+  jefe_ingenieria:'Jefe Ingeniería', cubicador:'Cubicador', analista_credito:'Analista Crédito'
+}
+
+const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Cubicación','Presupuestos','Crédito','Clientes','Usuarios']
+
+const PERMISOS: Record<string,Rol[]> = {
+  Dashboard: ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'],
+  Oportunidades: ['admin','gerente_ventas','vendedor','jefe_ingenieria'],
+  Ingeniería: ['admin','jefe_ingenieria'],
+  Cubicación: ['admin','cubicador'],
+  Presupuestos: ['admin','cubicador','analista_credito'],
+  Crédito: ['admin','analista_credito'],
+  Clientes: ['admin','gerente_ventas','vendedor'],
+  Usuarios: ['admin','gerente_ventas'],
+}
+
+interface Profile { id:string; nombre:string; apellido:string; email:string; rol:Rol; activo:boolean; created_at:string }
+
+interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:Rol }
+interface ModalEdit { id:string; nombre:string; apellido:string; rol:Rol }
+
+export default function Usuarios(){
+  const [users,setUsers]=useState<Profile[]>([])
+  const [loading,setLoading]=useState(true)
+  const [showPermisos,setShowPermisos]=useState(false)
+  const [creating,setCreating]=useState(false)
+  const [editing,setEditing]=useState<ModalEdit|null>(null)
+  const [form,setForm]=useState<ModalCreate>({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'})
+  const [saving,setSaving]=useState(false)
+  const [error,setError]=useState<string|null>(null)
+
+  async function load(){
+    const {data}=await supabase.from('profiles').select('*').order('created_at',{ascending:false})
+    setUsers((data as Profile[])||[])
+    setLoading(false)
+  }
+  useEffect(()=>{load()},[])
+
+  async function handleCreate(){
+    setSaving(true); setError(null)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const res=await fetch(SUPABASE_URL+'/functions/v1/create-user',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+session?.access_token},
+        body:JSON.stringify(form),
+      })
+      const json=await res.json()
+      if(!res.ok) throw new Error(json.error||'Error al crear usuario')
+      setCreating(false)
+      setForm({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'})
+      await load()
+    }catch(e:unknown){setError(e instanceof Error?e.message:'Error desconocido')}
+    setSaving(false)
+  }
+
+  async function handleEdit(){
+    if(!editing) return
+    setSaving(true); setError(null)
+    const {error:err}=await supabase.from('profiles').update({nombre:editing.nombre,apellido:editing.apellido,rol:editing.rol}).eq('id',editing.id)
+    if(err) setError(err.message)
+    else{ setEditing(null); await load() }
+    setSaving(false)
+  }
+
+  async function toggleActivo(u:Profile){
+    await supabase.from('profiles').update({activo:!u.activo}).eq('id',u.id)
+    await load()
+  }
+
+  const ROL_BADGE:Record<Rol,string>={
+    admin:'bg-red-100 text-red-700',
+    gerente_ventas:'bg-purple-100 text-purple-700',
+    vendedor:'bg-blue-100 text-blue-700',
+    jefe_ingenieria:'bg-cyan-100 text-cyan-700',
+    cubicador:'bg-green-100 text-green-700',
+    analista_credito:'bg-amber-100 text-amber-700',
+  }
+
+  if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
+
+  return(
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white"><h1 className="text-lg font-bold text-gray-800">Usuarios</h1><p className="text-xs text-gray-500">{profiles.length} usuarios</p></div>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
+        <div><h1 className="text-lg font-bold text-gray-800">Usuarios</h1><p className="text-xs text-gray-500">{users.length} usuarios registrados</p></div>
+        <button onClick={()=>{setCreating(true);setError(null)}} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo usuario</button>
+      </div>
+
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Tabla usuarios */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full">
-            <thead><tr className="border-b border-gray-100 bg-gray-50"><th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Usuario</th><th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Email</th><th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Rol</th><th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Estado</th></tr></thead>
-            <tbody>
-              {profiles.map((p,i) => (
-                <tr key={p.id} className={`border-b border-gray-50 hover:bg-gray-50 ${i%2===0?'bg-white':'bg-gray-50/30'}`}>
-                  <td className="px-4 py-3"><div className="flex items-center gap-2.5"><div className="w-8 h-8 rounded-full bg-brand-red flex items-center justify-center text-white text-xs font-bold">{p.nombre[0]}{p.apellido[0]}</div><p className="text-sm font-medium text-gray-800">{p.nombre} {p.apellido}</p></div></td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{p.email}</td>
-                  <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RC[p.rol]||'bg-gray-100 text-gray-600'}`}>{p.rol.replace(/_/g,' ')}</span></td>
-                  <td className="px-4 py-3">{p.activo?<span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle size={13}/>Activo</span>:<span className="flex items-center gap-1 text-xs text-red-500"><XCircle size={13}/>Inactivo</span>}</td>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Usuario</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Rol</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {users.map(u=>(
+                <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
+                  <td className="px-4 py-3 text-gray-500">{u.email}</td>
+                  <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium '+(ROL_BADGE[u.rol]??'bg-gray-100 text-gray-600')}>{ROL_LABEL[u.rol]??u.rol}</span></td>
+                  <td className="px-4 py-3">{u.activo?<span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span>:<span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={()=>{setEditing({id:u.id,nombre:u.nombre,apellido:u.apellido,rol:u.rol});setError(null)}} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700" title="Editar"><Pencil size={14}/></button>
+                      <button onClick={()=>toggleActivo(u)} className={"p-1.5 rounded text-xs font-medium transition-colors "+(u.activo?'hover:bg-red-50 text-red-500':'hover:bg-green-50 text-green-600')} title={u.activo?'Desactivar':'Activar'}>{u.activo?<UserX size={14}/>:<UserCheck size={14}/>}</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Matriz permisos */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <button onClick={()=>setShowPermisos(p=>!p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+            <span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span>
+            {showPermisos?<ChevronUp size={16} className="text-gray-400"/>:<ChevronDown size={16} className="text-gray-400"/>}
+          </button>
+          {showPermisos&&(
+            <div className="border-t border-gray-100 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-semibold text-gray-500">Módulo</th>
+                    {ROLES.map(r=><th key={r} className="px-3 py-2 font-semibold text-gray-500 text-center whitespace-nowrap">{ROL_LABEL[r]}</th>)}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {MODULOS.map(m=>(
+                    <tr key={m} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium text-gray-700">{m}</td>
+                      {ROLES.map(r=>(
+                        <td key={r} className="px-3 py-2 text-center">
+                          {PERMISOS[m]?.includes(r)?<span className="inline-block w-4 h-4 bg-green-500 rounded-sm"/>:<span className="inline-block w-4 h-4 bg-gray-100 rounded-sm"/>}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Modal Crear */}
+      {creating&&(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Nuevo usuario</h2></div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
+                <select value={form.rol} onChange={e=>setForm(f=>({...f,rol:e.target.value as Rol}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                  {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                </select>
+              </div>
+              {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={()=>setCreating(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={handleCreate} disabled={saving||!form.nombre||!form.email||!form.password} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">{saving?'Creando...':'Crear usuario'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
+      {editing&&(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Editar usuario</h2></div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e=>setEditing(ed=>ed?{...ed,nombre:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e=>setEditing(ed=>ed?{...ed,apellido:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
+                <select value={editing.rol} onChange={e=>setEditing(ed=>ed?{...ed,rol:e.target.value as Rol}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                  {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                </select>
+              </div>
+              {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={()=>setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={handleEdit} disabled={saving} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">{saving?'Guardando...':'Guardar cambios'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
