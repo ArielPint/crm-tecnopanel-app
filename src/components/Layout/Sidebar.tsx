@@ -7,9 +7,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { RolUsuario } from '@/types/database'
 
 interface NavItem {
-  to:    string
+  to: string
   label: string
-  icon:  React.ReactNode
+  icon: React.ReactNode
   roles: RolUsuario[]
 }
 
@@ -17,24 +17,24 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: 'Principal',
     items: [
-      { to: '/dashboard',    label: 'Dashboard',    icon: <LayoutDashboard size={16} />, roles: ['admin','gerente_ventas','gerente_general','vendedor','jefe_ingenieria','ingeniero','cubicador','presupuestista','finanzas'] },
-      { to: '/oportunidades',label: 'Oportunidades', icon: <Briefcase size={16} />,      roles: ['admin','gerente_ventas','gerente_general','vendedor'] },
+      { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, roles: ['admin','gerente_ventas','gerente_general','vendedor','jefe_ingenieria','ingeniero','cubicador','presupuestista','finanzas'] },
+      { to: '/oportunidades',label: 'Oportunidades', icon: <Briefcase size={16} />, roles: ['admin','gerente_ventas','gerente_general','vendedor'] },
     ],
   },
   {
-    group: 'MÃ³dulos',
+    group: 'Modulos',
     items: [
-      { to: '/ingenieria',   label: 'IngenierÃ­a',   icon: <HardHat size={16} />,        roles: ['admin','jefe_ingenieria','ingeniero'] },
-      { to: '/cubicacion',   label: 'CubicaciÃ³n',   icon: <Calculator size={16} />,     roles: ['admin','cubicador','jefe_ingenieria'] },
-      { to: '/presupuestos', label: 'Presupuestos', icon: <FileText size={16} />,       roles: ['admin','presupuestista','gerente_ventas'] },
-      { to: '/credito',      label: 'Eval. Crediticia', icon: <CreditCard size={16} />, roles: ['admin','finanzas'] },
+      { to: '/ingenieria', label: 'Ingenieria', icon: <HardHat size={16} />, roles: ['admin','jefe_ingenieria','ingeniero'] },
+      { to: '/cubicacion', label: 'Cubicacion', icon: <Calculator size={16} />, roles: ['admin','cubicador','jefe_ingenieria'] },
+      { to: '/presupuestos', label: 'Presupuestos', icon: <FileText size={16} />, roles: ['admin','presupuestista','gerente_ventas'] },
+      { to: '/credito', label: 'Eval. Crediticia', icon: <CreditCard size={16} />, roles: ['admin','finanzas'] },
     ],
   },
   {
     group: 'Sistema',
     items: [
-      { to: '/clientes',     label: 'Clientes',     icon: <Building2 size={16} />,      roles: ['admin','gerente_ventas','gerente_general','vendedor'] },
-      { to: '/usuarios',     label: 'Usuarios',     icon: <Users size={16} />,          roles: ['admin'] },
+      { to: '/clientes', label: 'Clientes', icon: <Building2 size={16} />, roles: ['admin','gerente_ventas','gerente_general','vendedor'] },
+      { to: '/usuarios', label: 'Usuarios', icon: <Users size={16} />, roles: ['admin'] },
     ],
   },
 ]
@@ -71,10 +71,10 @@ export function Sidebar() {
                 to={item.to}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors
-                   ${isActive
-                     ? 'bg-brand-red/15 text-red-400 border-l-2 border-brand-red'
-                     : 'text-slate-400 hover:bg-brand-red/10 hover:text-slate-200'
-                   }`
+                  ${isActive
+                    ? 'bg-brand-red/15 text-red-400 border-l-2 border-brand-red'
+                    : 'text-slate-400 hover:bg-brand-red/10 hover:text-slate-200'
+                  }`
                 }
               >
                 {item.icon}
@@ -101,7 +101,7 @@ export function Sidebar() {
                 {profile.rol.replace('_', ' ')}
               </p>
             </div>
-            <button onClick={signOut} className="text-slate-500 hover:text-red-400 transition-colors" title="Cerrar sesiÃ³n">
+            <button onClick={signOut} className="text-slate-500 hover:text-red-400 transition-colors" title="Cerrar sesion">
               <LogOut size={14} />
             </button>
           </div>
