@@ -1,105 +1,245 @@
 import { useEffect, useState } from 'react'
-import { Plus, X, Building2, Phone, Mail, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, UserPlus, X, Building2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
 
-interface Cliente { id:string;razon_social:string;rut:string|null;rubro:string|null;ciudad:string|null;contacto_nombre:string|null;contacto_email:string|null;contacto_fono:string|null;es_nuevo:boolean }
-interface FormData { razon_social:string;rut:string;rubro:string;ciudad:string;region:string;contacto_nombre:string;contacto_email:string;contacto_fono:string }
-const INIT:FormData = { razon_social:'',rut:'',rubro:'',ciudad:'',region:'',contacto_nombre:'',contacto_email:'',contacto_fono:'' }
+interface Cliente {
+  id: string; razon_social: string; rut: string; tipo: string; rubro: string
+  direccion: string; ciudad: string; region: string
+  contacto_nombre: string; contacto_email: string; contacto_fono: string
+  notas: string; created_at: string
+}
+interface Contacto {
+  id: string; cliente_id: string; nombre: string; cargo: string
+  email: string; fono: string; observaciones: string
+}
+
+const BLANK_CLIENTE = { razon_social:'', rut:'', tipo:'empresa', rubro:'', direccion:'', ciudad:'', region:'', contacto_nombre:'', contacto_email:'', contacto_fono:'', notas:'' }
+const BLANK_CONTACTO = { nombre:'', cargo:'', email:'', fono:'', observaciones:'' }
 
 export default function Clientes() {
-  const { profile } = useAuth()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<FormData>(INIT)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [contactos, setContactos] = useState<Record<string, Contacto[]>>({})
+  const [editCliente, setEditCliente] = useState<Cliente | null>(null)
+  const [newCliente, setNewCliente] = useState(false)
+  const [clienteForm, setClienteForm] = useState<typeof BLANK_CLIENTE>(BLANK_CLIENTE)
+  const [editContacto, setEditContacto] = useState<Contacto | null>(null)
+  const [newContacto, setNewContacto] = useState<string | null>(null) // cliente_id
+  const [contactoForm, setContactoForm] = useState<typeof BLANK_CONTACTO>(BLANK_CONTACTO)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [busqueda, setBusqueda] = useState('')
+  const [search, setSearch] = useState('')
 
   async function load() {
     const { data } = await supabase.from('clientes').select('*').order('razon_social')
     setClientes((data as Cliente[]) || [])
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
-  const filtrados = clientes.filter(c => c.razon_social.toLowerCase().includes(busqueda.toLowerCase()) || (c.ciudad||'').toLowerCase().includes(busqueda.toLowerCase()))
-  function cerrar() { setShowForm(false); setForm(INIT); setError('') }
-  async function handleSubmit(e:React.FormEvent) {
-    e.preventDefault()
-    if (!form.razon_social.trim()) return setError('La razon social es requerida')
-    setSaving(true); setError('')
-    const { error:err } = await supabase.from('clientes').insert({ razon_social:form.razon_social.trim(),rut:form.rut||null,rubro:form.rubro||null,ciudad:form.ciudad||null,region:form.region||null,contacto_nombre:form.contacto_nombre||null,contacto_email:form.contacto_email||null,contacto_fono:form.contacto_fono||null,creado_por:profile?.id||null,es_nuevo:true })
-    if (err) { setError(err.message); setSaving(false); return }
-    cerrar(); setSaving(false); await load()
+
+  async function loadContactos(clienteId: string) {
+    const { data } = await supabase.from('cliente_contactos').select('*').eq('cliente_id', clienteId).order('created_at')
+    setContactos(prev => ({ ...prev, [clienteId]: (data as Contacto[]) || [] }))
   }
-  if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin" /></div>
+
+  useEffect(() => { load() }, [])
+
+  async function toggleExpand(id: string) {
+    if (expanded === id) { setExpanded(null); return }
+    setExpanded(id)
+    if (!contactos[id]) await loadContactos(id)
+  }
+
+  async function saveCliente() {
+    setSaving(true)
+    if (editCliente) {
+      await supabase.from('clientes').update(clienteForm).eq('id', editCliente.id)
+    } else {
+      await supabase.from('clientes').insert(clienteForm)
+    }
+    setSaving(false); setEditCliente(null); setNewCliente(false); load()
+  }
+
+  async function deleteCliente(id: string) {
+    if (!confirm('¿Eliminar este cliente?')) return
+    await supabase.from('clientes').delete().eq('id', id)
+    setExpanded(null); load()
+  }
+
+  async function saveContacto() {
+    setSaving(true)
+    if (editContacto) {
+      await supabase.from('cliente_contactos').update(contactoForm).eq('id', editContacto.id)
+      await loadContactos(editContacto.cliente_id)
+    } else if (newContacto) {
+      await supabase.from('cliente_contactos').insert({ ...contactoForm, cliente_id: newContacto })
+      await loadContactos(newContacto)
+    }
+    setSaving(false); setEditContacto(null); setNewContacto(null)
+  }
+
+  async function deleteContacto(c: Contacto) {
+    if (!confirm('¿Eliminar este contacto?')) return
+    await supabase.from('cliente_contactos').delete().eq('id', c.id)
+    await loadContactos(c.cliente_id)
+  }
+
+  function openEditCliente(c: Cliente) {
+    setClienteForm({ razon_social:c.razon_social, rut:c.rut, tipo:c.tipo, rubro:c.rubro||'', direccion:c.direccion||'', ciudad:c.ciudad||'', region:c.region||'', contacto_nombre:c.contacto_nombre||'', contacto_email:c.contacto_email||'', contacto_fono:c.contacto_fono||'', notas:c.notas||'' })
+    setEditCliente(c); setNewCliente(false)
+  }
+
+  function openNewCliente() { setClienteForm(BLANK_CLIENTE); setNewCliente(true); setEditCliente(null) }
+
+  function openEditContacto(c: Contacto) {
+    setContactoForm({ nombre:c.nombre, cargo:c.cargo||'', email:c.email||'', fono:c.fono||'', observaciones:c.observaciones||'' })
+    setEditContacto(c); setNewContacto(null)
+  }
+
+  function openNewContacto(clienteId: string) {
+    setContactoForm(BLANK_CONTACTO); setNewContacto(clienteId); setEditContacto(null)
+  }
+
+  const filtered = clientes.filter(c => c.razon_social.toLowerCase().includes(search.toLowerCase()) || c.rut?.includes(search) || c.ciudad?.toLowerCase().includes(search.toLowerCase()))
+
+  if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-4">
-        <div><h1 className="text-lg font-bold text-gray-800">Clientes</h1><p className="text-xs text-gray-500">{filtrados.length} registros</p></div>
-        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar..." className="ml-4 px-3 py-2 border border-gray-200 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-red-400" />
-        <button onClick={()=>setShowForm(true)} className="ml-auto flex items-center gap-2 text-white text-sm font-medium px-4 py-2 rounded-lg" style={{background:'#ed3224'}}><Plus size={16} /> Nuevo cliente</button>
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between gap-4">
+        <div><h1 className="text-lg font-bold text-gray-800">Clientes</h1><p className="text-xs text-gray-500">{clientes.length} clientes registrados</p></div>
+        <div className="flex items-center gap-3">
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar..." className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-red-200"/>
+          <button onClick={openNewCliente} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo cliente</button>
+        </div>
       </div>
-      <div className="flex-1 overflow-auto p-6">
-        {filtrados.length===0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-            <Building2 size={40} className="mb-3 opacity-30" />
-            <p className="text-sm">No hay clientes registrados</p>
-            <button onClick={()=>setShowForm(true)} className="mt-3 text-sm text-red-500 hover:underline">Agregar el primero</button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtrados.map(c => (
-              <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-red-200 transition-all">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center"><Building2 size={16} style={{color:'#ed3224'}} /></div>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{c.razon_social}</p>{c.rut&&<p className="text-xs text-gray-400">{c.rut}</p>}</div>
-                  {c.es_nuevo&&<span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Nuevo</span>}
-                </div>
-                <div className="space-y-1 text-xs text-gray-500">
-                  {c.rubro&&<p>{c.rubro}</p>}
-                  {c.ciudad&&<div className="flex items-center gap-1"><MapPin size={11}/> {c.ciudad}</div>}
-                  {c.contacto_nombre&&<p className="font-medium text-gray-600 mt-2">{c.contacto_nombre}</p>}
-                  {c.contacto_email&&<div className="flex items-center gap-1"><Mail size={11}/> {c.contacto_email}</div>}
-                  {c.contacto_fono&&<div className="flex items-center gap-1"><Phone size={11}/> {c.contacto_fono}</div>}
-                </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-auto p-6 space-y-3">
+        {filtered.map(c => (
+          <div key={c.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            {/* Row */}
+            <div className="flex items-center gap-4 px-4 py-3">
+              <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0"><Building2 size={18} className="text-brand-red"/></div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800 text-sm truncate">{c.razon_social}</p>
+                <p className="text-xs text-gray-400">{c.rut} {c.ciudad ? '· '+c.ciudad : ''} {c.rubro ? '· '+c.rubro : ''}</p>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-      {showForm&&(
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b">
-              <h2 className="text-base font-bold text-gray-800">Nuevo Cliente</h2>
-              <button onClick={cerrar} className="text-gray-400 hover:text-gray-600"><X size={18}/></button>
+              <div className="flex items-center gap-1">
+                <button onClick={()=>openEditCliente(c)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" title="Editar"><Pencil size={14}/></button>
+                <button onClick={()=>deleteCliente(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Eliminar"><Trash2 size={14}/></button>
+                <button onClick={()=>toggleExpand(c.id)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 ml-1">
+                  {expanded===c.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                </button>
+              </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Razon social *</label><input value={form.razon_social} onChange={e=>setForm(f=>({...f,razon_social:e.target.value}))} placeholder="Empresa Ltda." required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">RUT</label><input value={form.rut} onChange={e=>setForm(f=>({...f,rut:e.target.value}))} placeholder="12.345.678-9" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Rubro</label><input value={form.rubro} onChange={e=>setForm(f=>({...f,rubro:e.target.value}))} placeholder="Construccion..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Ciudad</label><input value={form.ciudad} onChange={e=>setForm(f=>({...f,ciudad:e.target.value}))} placeholder="Santiago" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Region</label><input value={form.region} onChange={e=>setForm(f=>({...f,region:e.target.value}))} placeholder="Metropolitana" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-              </div>
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Contacto principal</p>
-                <div className="space-y-3">
-                  <div><label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label><input value={form.contacto_nombre} onChange={e=>setForm(f=>({...f,contacto_nombre:e.target.value}))} placeholder="Juan Perez" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Email</label><input type="email" value={form.contacto_email} onChange={e=>setForm(f=>({...f,contacto_email:e.target.value}))} placeholder="juan@empresa.cl" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Telefono</label><input value={form.contacto_fono} onChange={e=>setForm(f=>({...f,contacto_fono:e.target.value}))} placeholder="+56 9 1234 5678" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                  </div>
+
+            {/* Expanded: contacts */}
+            {expanded===c.id && (
+              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contactos</p>
+                  <button onClick={()=>openNewContacto(c.id)} className="flex items-center gap-1 text-xs text-brand-red hover:text-red-700 font-medium"><UserPlus size={13}/>Agregar contacto</button>
                 </div>
+                {/* Primary contact from clientes table */}
+                {c.contacto_nombre && (
+                  <div className="bg-white rounded-lg px-3 py-2 mb-2 border border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-[10px] font-bold text-brand-red">{c.contacto_nombre[0]?.toUpperCase()}</div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">{c.contacto_nombre} <span className="text-gray-400 font-normal">(Principal)</span></p>
+                        <p className="text-[11px] text-gray-400">{[c.contacto_email, c.contacto_fono].filter(Boolean).join(' · ')}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Additional contacts */}
+                {(contactos[c.id]||[]).map(ct => (
+                  <div key={ct.id} className="bg-white rounded-lg px-3 py-2 mb-2 border border-gray-100">
+                    <div className="flex items-start gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 flex-shrink-0 mt-0.5">{ct.nombre[0]?.toUpperCase()}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-700">{ct.nombre}{ct.cargo ? <span className="text-gray-400 font-normal"> · {ct.cargo}</span> : ''}</p>
+                        <p className="text-[11px] text-gray-400">{[ct.email,ct.fono].filter(Boolean).join(' · ')}</p>
+                        {ct.observaciones && <p className="text-[11px] text-gray-500 mt-1 italic">"{ct.observaciones}"</p>}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={()=>openEditContacto(ct)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><Pencil size={12}/></button>
+                        <button onClick={()=>deleteContacto(ct)} className="p-1 rounded hover:bg-red-50 text-red-400"><Trash2 size={12}/></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(contactos[c.id]||[]).length===0 && !c.contacto_nombre && (
+                  <p className="text-xs text-gray-400 text-center py-2">Sin contactos registrados</p>
+                )}
+                {/* Notes */}
+                {c.notas && <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100"><p className="text-xs text-amber-700 italic">{c.notas}</p></div>}
               </div>
-              {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</p>}
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={cerrar} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60" style={{background:'#ed3224'}}>{saving?'Guardando...':'Crear cliente'}</button>
+            )}
+          </div>
+        ))}
+        {filtered.length===0 && <div className="text-center text-gray-400 py-12 text-sm">No se encontraron clientes</div>}
+      </div>
+
+      {/* Modal Cliente */}
+      {(editCliente||newCliente) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-base font-bold text-gray-800">{editCliente ? 'Editar cliente' : 'Nuevo cliente'}</h2>
+              <button onClick={()=>{setEditCliente(null);setNewCliente(false)}} className="p-1.5 rounded hover:bg-gray-100"><X size={16}/></button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Razón Social *</label><input value={clienteForm.razon_social} onChange={e=>setClienteForm(f=>({...f,razon_social:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">RUT</label><input value={clienteForm.rut} onChange={e=>setClienteForm(f=>({...f,rut:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Tipo</label>
+                  <select value={clienteForm.tipo} onChange={e=>setClienteForm(f=>({...f,tipo:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200">
+                    <option value="empresa">Empresa</option><option value="persona">Persona</option><option value="gobierno">Gobierno</option>
+                  </select>
+                </div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Rubro</label><input value={clienteForm.rubro} onChange={e=>setClienteForm(f=>({...f,rubro:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Ciudad</label><input value={clienteForm.ciudad} onChange={e=>setClienteForm(f=>({...f,ciudad:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Dirección</label><input value={clienteForm.direccion} onChange={e=>setClienteForm(f=>({...f,direccion:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
               </div>
-            </form>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1">Contacto principal</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={clienteForm.contacto_nombre} onChange={e=>setClienteForm(f=>({...f,contacto_nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input value={clienteForm.contacto_email} onChange={e=>setClienteForm(f=>({...f,contacto_email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Teléfono</label><input value={clienteForm.contacto_fono} onChange={e=>setClienteForm(f=>({...f,contacto_fono:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Notas</label><textarea value={clienteForm.notas} onChange={e=>setClienteForm(f=>({...f,notas:e.target.value}))} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"/></div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button onClick={()=>{setEditCliente(null);setNewCliente(false)}} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={saveCliente} disabled={saving||!clienteForm.razon_social} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Guardando...':'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Contacto */}
+      {(editContacto||newContacto) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-800">{editContacto ? 'Editar contacto' : 'Nuevo contacto'}</h2>
+              <button onClick={()=>{setEditContacto(null);setNewContacto(null)}} className="p-1.5 rounded hover:bg-gray-100"><X size={16}/></button>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre *</label><input value={contactoForm.nombre} onChange={e=>setContactoForm(f=>({...f,nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Cargo</label><input value={contactoForm.cargo} onChange={e=>setContactoForm(f=>({...f,cargo:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Teléfono</label><input value={contactoForm.fono} onChange={e=>setContactoForm(f=>({...f,fono:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+              </div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input value={contactoForm.email} onChange={e=>setContactoForm(f=>({...f,email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Observaciones</label><textarea value={contactoForm.observaciones} onChange={e=>setContactoForm(f=>({...f,observaciones:e.target.value}))} rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"/></div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={()=>{setEditContacto(null);setNewContacto(null)}} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={saveContacto} disabled={saving||!contactoForm.nombre} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Guardando...':'Guardar'}</button>
+            </div>
           </div>
         </div>
       )}
