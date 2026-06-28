@@ -1,86 +1,122 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { usePermisos } from '@/contexts/PermisosContext'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
-const ROLES = ['admin','gerente_ventas','vendedor','jefe_ingenieria','cubicador','analista_credito'] as const
-type Rol = typeof ROLES[number]
-const ROL_LABEL: Record<Rol,string> = {
-  admin:'Admin', gerente_ventas:'Gerente Ventas', vendedor:'Vendedor',
-  jefe_ingenieria:'Jefe Ingeniería', cubicador:'Cubicador', analista_credito:'Analista Crédito'
+
+// Roles definidos en el sistema con sus etiquetas y colores
+const ROL_META: Record<string, { label: string; badge: string; descripcion: string }> = {
+  admin:           { label:'Admin',            badge:'bg-red-100 text-red-700',     descripcion:'Acceso total al sistema' },
+  gerente_general: { label:'Gerente General',  badge:'bg-purple-100 text-purple-700', descripcion:'Supervisión general y reportes' },
+  gerente_ventas:  { label:'Gerente Ventas',   badge:'bg-indigo-100 text-indigo-700', descripcion:'Gestión del equipo de ventas' },
+  vendedor:        { label:'Vendedor',          badge:'bg-blue-100 text-blue-700',   descripcion:'Gestión de oportunidades y clientes' },
+  jefe_ingenieria: { label:'Jefe Ingeniería',  badge:'bg-cyan-100 text-cyan-700',   descripcion:'Coordinación del equipo técnico' },
+  ingeniero:       { label:'Ingeniero',         badge:'bg-teal-100 text-teal-700',   descripcion:'Tareas de ingeniería y cubicación' },
+  cubicador:       { label:'Cubicador',         badge:'bg-green-100 text-green-700', descripcion:'Cubicación de proyectos' },
+  presupuestista:  { label:'Presupuestista',    badge:'bg-lime-100 text-lime-700',   descripcion:'Elaboración de presupuestos' },
+  finanzas:        { label:'Finanzas',          badge:'bg-amber-100 text-amber-700', descripcion:'Evaluación crediticia y finanzas' },
 }
+
 const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Cubicación','Presupuestos','Crédito','Clientes','Usuarios']
-interface Profile{id:string;nombre:string;apellido:string;email:string;rol:Rol;activo:boolean;created_at:string}
-interface ModalCreate{nombre:string;apellido:string;email:string;password:string;rol:Rol}
-interface ModalEdit{id:string;nombre:string;apellido:string;rol:Rol}
 
-export default function Usuarios(){
-  const [users,setUsers]=useState<Profile[]>([])
-  const [loading,setLoading]=useState(true)
-  const [showPermisos,setShowPermisos]=useState(false)
-  const [creating,setCreating]=useState(false)
-  const [editing,setEditing]=useState<ModalEdit|null>(null)
-  const [form,setForm]=useState<ModalCreate>({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'})
-  const [saving,setSaving]=useState(false)
-  const [error,setError]=useState<string|null>(null)
-  const {permisos,togglePermiso}=usePermisos()
-  const [toggling,setToggling]=useState<string|null>(null)
+type Rol = keyof typeof ROL_META
+interface Profile { id:string; nombre:string; apellido:string; email:string; rol:string; activo:boolean; created_at:string }
+interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:string }
+interface ModalEdit { id:string; nombre:string; apellido:string; rol:string }
 
-  async function load(){
-    const {data}=await supabase.from('profiles').select('*').order('created_at',{ascending:false})
-    setUsers((data as Profile[])||[]);setLoading(false)
+export default function Usuarios() {
+  const [users, setUsers] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showPermisos, setShowPermisos] = useState(false)
+  const [showRoles, setShowRoles] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<ModalEdit | null>(null)
+  const [form, setForm] = useState<ModalCreate>({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { permisos, togglePermiso } = usePermisos()
+  const [toggling, setToggling] = useState<string | null>(null)
+
+  // Roles que realmente existen en el sistema (desde profiles)
+  const [rolesActivos, setRolesActivos] = useState<string[]>([])
+
+  async function load() {
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    const lista = (data as Profile[]) || []
+    setUsers(lista)
+    // Extraer roles únicos usados en profiles, mantener orden de ROL_META
+    const usados = new Set(lista.map(u => u.rol))
+    const ordenados = Object.keys(ROL_META).filter(r => usados.has(r))
+    // Incluir también roles que están en permisos_modulo aunque no haya usuarios
+    setRolesActivos(ordenados.length ? ordenados : Object.keys(ROL_META))
+    setLoading(false)
   }
-  useEffect(()=>{load()},[])
 
-  async function handleCreate(){
-    setSaving(true);setError(null)
-    try{
-      const {data:{session}}=await supabase.auth.getSession()
-      const res=await fetch(SUPABASE_URL+'/functions/v1/create-user',{
-        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session?.access_token},
-        body:JSON.stringify(form),
+  useEffect(() => { load() }, [])
+
+  // Actualizar rolesActivos cuando cambien permisos (puede haber roles en permisos sin usuarios)
+  useEffect(() => {
+    const rolesEnPermisos = [...new Set(permisos.map(p => p.rol))]
+    const rolesEnUsers = [...new Set(users.map(u => u.rol))]
+    const todos = [...new Set([...rolesEnUsers, ...rolesEnPermisos])]
+    const ordenados = Object.keys(ROL_META).filter(r => todos.includes(r))
+    if (ordenados.length) setRolesActivos(ordenados)
+  }, [permisos, users])
+
+  async function handleCreate() {
+    setSaving(true); setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(SUPABASE_URL + '/functions/v1/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
+        body: JSON.stringify(form),
       })
-      const json=await res.json()
-      if(!res.ok) throw new Error(json.error||'Error al crear usuario')
-      setCreating(false);setForm({nombre:'',apellido:'',email:'',password:'',rol:'vendedor'});await load()
-    }catch(e:unknown){setError(e instanceof Error?e.message:'Error desconocido')}
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al crear usuario')
+      setCreating(false); setForm({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor' }); await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error desconocido') }
     setSaving(false)
   }
 
-  async function handleEdit(){
-    if(!editing) return
-    setSaving(true);setError(null)
-    const {error:err}=await supabase.from('profiles').update({nombre:editing.nombre,apellido:editing.apellido,rol:editing.rol}).eq('id',editing.id)
-    if(err) setError(err.message)
-    else{setEditing(null);await load()}
+  async function handleEdit() {
+    if (!editing) return
+    setSaving(true); setError(null)
+    const { error: err } = await supabase.from('profiles').update({ nombre: editing.nombre, apellido: editing.apellido, rol: editing.rol }).eq('id', editing.id)
+    if (err) setError(err.message)
+    else { setEditing(null); await load() }
     setSaving(false)
   }
 
-  async function toggleActivo(u:Profile){
-    await supabase.from('profiles').update({activo:!u.activo}).eq('id',u.id);await load()
+  async function toggleActivo(u: Profile) {
+    await supabase.from('profiles').update({ activo: !u.activo }).eq('id', u.id); await load()
   }
 
-  async function handleTogglePermiso(modulo:string,rol:string,current:boolean){
-    const key=modulo+'|'+rol
+  async function handleTogglePermiso(modulo: string, rol: string, current: boolean) {
+    const key = modulo + '|' + rol
     setToggling(key)
-    await togglePermiso(modulo,rol,current)
+    await togglePermiso(modulo, rol, current)
     setToggling(null)
   }
 
-  const ROL_BADGE:Record<Rol,string>={
-    admin:'bg-red-100 text-red-700',gerente_ventas:'bg-purple-100 text-purple-700',vendedor:'bg-blue-100 text-blue-700',
-    jefe_ingenieria:'bg-cyan-100 text-cyan-700',cubicador:'bg-green-100 text-green-700',analista_credito:'bg-amber-100 text-amber-700',
-  }
+  // Conteo de usuarios por rol
+  const countPorRol = users.reduce<Record<string, number>>((acc, u) => {
+    acc[u.rol] = (acc[u.rol] || 0) + 1
+    return acc
+  }, {})
 
-  if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
-  return(
+  if (loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
+
+  return (
     <div className="flex flex-col h-full">
       <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
         <div><h1 className="text-lg font-bold text-gray-800">Usuarios</h1><p className="text-xs text-gray-500">{users.length} usuarios registrados</p></div>
-        <button onClick={()=>{setCreating(true);setError(null)}} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo usuario</button>
+        <button onClick={() => { setCreating(true); setError(null) }} className="flex items-center gap-2 px-4 py-2 bg-brand-red text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"><Plus size={16}/>Nuevo usuario</button>
       </div>
+
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Tabla de usuarios */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -93,56 +129,117 @@ export default function Usuarios(){
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {users.map(u=>(
-                <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
-                  <td className="px-4 py-3 text-gray-500">{u.email}</td>
-                  <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium '+(ROL_BADGE[u.rol]??'bg-gray-100 text-gray-600')}>{ROL_LABEL[u.rol]??u.rol}</span></td>
-                  <td className="px-4 py-3">{u.activo?<span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span>:<span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
-                  <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
-                    <button onClick={()=>{setEditing({id:u.id,nombre:u.nombre,apellido:u.apellido,rol:u.rol});setError(null)}} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
-                    <button onClick={()=>toggleActivo(u)} className={"p-1.5 rounded "+(u.activo?'hover:bg-red-50 text-red-500':'hover:bg-green-50 text-green-600')} title={u.activo?'Desactivar':'Activar'}>{u.activo?<UserX size={14}/>:<UserCheck size={14}/>}</button>
-                  </div></td>
-                </tr>
-              ))}
+              {users.map(u => {
+                const meta = ROL_META[u.rol as Rol]
+                return (
+                  <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
+                    <td className="px-4 py-3 text-gray-500">{u.email}</td>
+                    <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span></td>
+                    <td className="px-4 py-3">{u.activo ? <span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span> : <span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
+                    <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
+                      <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
+                      <button onClick={() => toggleActivo(u)} className={'p-1.5 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')} title={u.activo ? 'Desactivar' : 'Activar'}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
+                    </div></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Matriz permisos editable */}
+        {/* Tabla de Roles del sistema */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <button onClick={()=>setShowPermisos(p=>!p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span><span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Editable</span></div>
-            {showPermisos?<ChevronUp size={16} className="text-gray-400"/>:<ChevronDown size={16} className="text-gray-400"/>}
+          <button onClick={() => setShowRoles(p => !p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2">
+              <Shield size={15} className="text-gray-400"/>
+              <span className="text-sm font-semibold text-gray-700">Roles del sistema</span>
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{Object.keys(ROL_META).length} roles</span>
+            </div>
+            {showRoles ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
           </button>
-          {showPermisos&&(
+          {showRoles && (
+            <div className="border-t border-gray-100 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Rol</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Descripción</th>
+                    <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Usuarios</th>
+                    <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase">En uso</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {Object.entries(ROL_META).map(([rol, meta]) => {
+                    const count = countPorRol[rol] || 0
+                    return (
+                      <tr key={rol} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5">
+                          <span className={'text-xs px-2 py-1 rounded-full font-medium ' + meta.badge}>{meta.label}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500">{meta.descripcion}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="text-sm font-bold text-gray-700">{count}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {count > 0
+                            ? <span className="inline-block w-2 h-2 rounded-full bg-green-500"/>
+                            : <span className="inline-block w-2 h-2 rounded-full bg-gray-200"/>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Matriz de permisos — dinámica según roles activos */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <button onClick={() => setShowPermisos(p => !p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span>
+              <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Editable</span>
+              <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">{rolesActivos.length} roles activos</span>
+            </div>
+            {showPermisos ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
+          </button>
+          {showPermisos && (
             <div className="border-t border-gray-100 overflow-x-auto">
               <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">Haz clic en una celda para activar o desactivar el acceso. Los cambios se guardan al instante.</p>
               <table className="w-full text-xs">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left px-4 py-2 font-semibold text-gray-500">Módulo</th>
-                    {ROLES.map(r=><th key={r} className="px-3 py-2 font-semibold text-gray-500 text-center whitespace-nowrap">{ROL_LABEL[r]}</th>)}
+                    <th className="text-left px-4 py-2 font-semibold text-gray-500 sticky left-0 bg-gray-50 z-10">Módulo</th>
+                    {rolesActivos.map(r => (
+                      <th key={r} className="px-3 py-2 font-semibold text-gray-500 text-center whitespace-nowrap">
+                        <div>{ROL_META[r as Rol]?.label ?? r}</div>
+                        <div className="text-[10px] font-normal text-gray-300">{countPorRol[r] ?? 0}u</div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {MODULOS.map(m=>(
+                  {MODULOS.map(m => (
                     <tr key={m} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-medium text-gray-700">{m}</td>
-                      {ROLES.map(r=>{
-                        const row=permisos.find(p=>p.modulo===m&&p.rol===r)
-                        const val=row?.permitido??false
-                        const key=m+'|'+r
-                        const isToggling=toggling===key
-                        return(
+                      <td className="px-4 py-2 font-medium text-gray-700 sticky left-0 bg-white">{m}</td>
+                      {rolesActivos.map(r => {
+                        const row = permisos.find(p => p.modulo === m && p.rol === r)
+                        const val = row?.permitido ?? false
+                        const key = m + '|' + r
+                        const isToggling = toggling === key
+                        return (
                           <td key={r} className="px-3 py-2 text-center">
                             <button
-                              onClick={()=>handleTogglePermiso(m,r,val)}
+                              onClick={() => handleTogglePermiso(m, r, val)}
                               disabled={isToggling}
-                              title={val?'Quitar acceso a '+ROL_LABEL[r]:'Dar acceso a '+ROL_LABEL[r]}
-                              className={"w-6 h-6 rounded transition-all "+(isToggling?'opacity-50 cursor-wait ':(val?'bg-green-500 hover:bg-green-600':'bg-gray-100 hover:bg-gray-200'))}
+                              title={val ? 'Quitar acceso a ' + (ROL_META[r as Rol]?.label ?? r) : 'Dar acceso a ' + (ROL_META[r as Rol]?.label ?? r)}
+                              className={'w-6 h-6 rounded transition-all ' + (isToggling ? 'opacity-50 cursor-wait ' : (val ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-100 hover:bg-gray-200'))}
                             >
-                              {isToggling?<span className="block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"/>:(val?<span className="text-white text-[10px] font-bold">✓</span>:<span className="text-gray-300 text-[10px]">—</span>)}
+                              {isToggling
+                                ? <span className="block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"/>
+                                : (val ? <span className="text-white text-[10px] font-bold">✓</span> : <span className="text-gray-300 text-[10px]">—</span>)}
                             </button>
                           </td>
                         )
@@ -156,50 +253,53 @@ export default function Usuarios(){
         </div>
       </div>
 
-      {creating&&(
+      {/* Modal crear usuario */}
+      {creating && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Nuevo usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
-              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
-              <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
-                <select value={form.rol} onChange={e=>setForm(f=>({...f,rol:e.target.value as Rol}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                  {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                  {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
                 </select>
               </div>
-              {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+              {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={()=>setCreating(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button onClick={handleCreate} disabled={saving||!form.nombre||!form.email||!form.password} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Creando...':'Crear usuario'}</button>
+              <button onClick={() => setCreating(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleCreate} disabled={saving || !form.nombre || !form.email || !form.password} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving ? 'Creando...' : 'Crear usuario'}</button>
             </div>
           </div>
         </div>
       )}
-      {editing&&(
+
+      {/* Modal editar usuario */}
+      {editing && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Editar usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e=>setEditing(ed=>ed?{...ed,nombre:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e=>setEditing(ed=>ed?{...ed,apellido:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e => setEditing(ed => ed ? { ...ed, nombre: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e => setEditing(ed => ed ? { ...ed, apellido: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
-                <select value={editing.rol} onChange={e=>setEditing(ed=>ed?{...ed,rol:e.target.value as Rol}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                  {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                <select value={editing.rol} onChange={e => setEditing(ed => ed ? { ...ed, rol: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                  {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
                 </select>
               </div>
-              {error&&<p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+              {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={()=>setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button onClick={handleEdit} disabled={saving} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving?'Guardando...':'Guardar cambios'}</button>
+              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleEdit} disabled={saving} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar cambios'}</button>
             </div>
           </div>
         </div>

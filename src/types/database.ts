@@ -91,6 +91,17 @@ export interface OportunidadDocumento {
   subido_por_profile?: Profile
 }
 
+export interface ClienteHistorial {
+  id: string
+  cliente_id: string
+  usuario_id: string | null
+  tipo: 'creacion' | 'modificacion'
+  datos_antes: Record<string, unknown> | null
+  datos_despues: Record<string, unknown> | null
+  created_at: string
+  usuario?: Profile
+}
+
 export interface OportunidadDatosEtapa {
   id: string
   oportunidad_id: string
