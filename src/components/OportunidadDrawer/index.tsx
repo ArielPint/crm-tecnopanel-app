@@ -5,18 +5,18 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Oportunidad, Profile, OportunidadHistorialEtapa, OportunidadDocumento } from '@/types/database'
 
 const ETAPAS_ORDER = [
-  'Clasificacion','Ingenieria','Cubicacion','Presupuestos',
-  'Revision Vendedor','Revision Cliente','Evaluacion Crediticia',
+  'Clasificación','Ingeniería','Cubicación','Presupuestos',
+  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
 ]
 
 const ETAPAS_LABELS: Record<string,string> = {
-  'Clasificacion': 'Clasificacion',
-  'Ingenieria': 'Ingenieria',
-  'Cubicacion': 'Cubicacion',
+  'Clasificación': 'Clasificación',
+  'Ingeniería': 'Ingeniería',
+  'Cubicación': 'Cubicación',
   'Presupuestos': 'Presupuestos',
-  'Revision Vendedor': 'Revision Vendedor',
-  'Revision Cliente': 'Revision Cliente',
-  'Evaluacion Crediticia': 'Evaluacion Crediticia',
+  'Revisión Vendedor': 'Revisión Vendedor',
+  'Revisión Cliente': 'Revisión Cliente',
+  'Evaluación Crediticia': 'Evaluación Crediticia',
 }
 
 const TIPO_COLOR: Record<string, string> = {
@@ -26,13 +26,13 @@ const TIPO_COLOR: Record<string, string> = {
 }
 
 const STAGE_ROLES: Record<string, string[]> = {
-  'Clasificacion': ['admin','gerente_ventas','vendedor'],
-  'Ingenieria': ['admin','jefe_ingenieria','ingeniero'],
-  'Cubicacion': ['admin','cubicador'],
+  'Clasificación': ['admin','gerente_ventas','vendedor'],
+  'Ingeniería': ['admin','jefe_ingenieria','ingeniero'],
+  'Cubicación': ['admin','cubicador'],
   'Presupuestos': ['admin','presupuestista'],
-  'Revision Vendedor': ['admin','gerente_ventas','vendedor'],
-  'Revision Cliente': ['admin','gerente_ventas','vendedor'],
-  'Evaluacion Crediticia': ['admin','finanzas'],
+  'Revisión Vendedor': ['admin','gerente_ventas','vendedor'],
+  'Revisión Cliente': ['admin','gerente_ventas','vendedor'],
+  'Evaluación Crediticia': ['admin','finanzas'],
 }
 
 function formatCLP(n: number) { return '$' + n.toLocaleString('es-CL') }
@@ -126,7 +126,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   }
 
   async function avanzarEtapa() {
-    const etapas = ['Clasificacion','Ingenieria','Cubicacion','Presupuestos','Revision Vendedor','Revision Cliente','Evaluacion Crediticia']
+    const etapas = ['Clasificación','Ingeniería','Cubicación','Presupuestos','Revisión Vendedor','Revisión Cliente','Evaluación Crediticia']
     const idx = etapas.indexOf(opp.etapa_actual)
     const newEtapa = idx >= 0 && idx < etapas.length - 1 ? etapas[idx + 1] : 'Ganado'
     setSaving(true)
@@ -183,7 +183,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  const etapas = ['Clasificacion','Ingenieria','Cubicacion','Presupuestos','Revision Vendedor','Revision Cliente','Evaluacion Crediticia']
+  const etapas = ['Clasificación','Ingeniería','Cubicación','Presupuestos','Revisión Vendedor','Revisión Cliente','Evaluación Crediticia']
   const currentIdx = etapas.indexOf(opp.etapa_actual)
   const isTerminal = ['Ganado','Perdido'].includes(opp.etapa_actual)
   const nextEtapa = currentIdx >= 0 && currentIdx < etapas.length - 1 ? etapas[currentIdx + 1] : 'Ganado'
@@ -206,8 +206,8 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
       </div>
     )
-    if (e === 'Clasificacion') return <div className="space-y-3">{ta('notas','Notas de clasificacion','Descripcion general, alcance...')}{field('origen_lead','Origen del lead','text','Referido, web, visita...')}{field('contacto_previo','Contacto previo','text','Si / No / Descripcion')}</div>
-    if (e === 'Ingenieria') return (
+    if (e === 'Clasificación') return <div className="space-y-3">{ta('notas','Notas de clasificacion','Descripcion general, alcance...')}{field('origen_lead','Origen del lead','text','Referido, web, visita...')}{field('contacto_previo','Contacto previo','text','Si / No / Descripcion')}</div>
+    if (e === 'Ingeniería') return (
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">{field('superficie_total','Superficie total (m²)','number','0')}{field('altura_libre','Altura libre (m)','number','0')}</div>
         <div className="grid grid-cols-2 gap-3">{field('largo','Largo (m)','number','0')}{field('ancho','Ancho (m)','number','0')}</div>
@@ -216,11 +216,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         {ta('observaciones_tecnicas','Observaciones tecnicas','Notas de ingenieria, restricciones...')}
       </div>
     )
-    if (e === 'Cubicacion') return <div className="space-y-3">{field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones','')}</div>
+    if (e === 'Cubicación') return <div className="space-y-3">{field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones','')}</div>
     if (e === 'Presupuestos') return <div className="space-y-3">{field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('margen_porcentaje','Margen (%)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}</div>
-    if (e === 'Revision Vendedor') return <div className="space-y-3">{field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}</div>
-    if (e === 'Revision Cliente') return <div className="space-y-3">{ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}</div>
-    if (e === 'Evaluacion Crediticia') return <div className="space-y-3">{field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}</div>
+    if (e === 'Revisión Vendedor') return <div className="space-y-3">{field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}</div>
+    if (e === 'Revisión Cliente') return <div className="space-y-3">{ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}</div>
+    if (e === 'Evaluación Crediticia') return <div className="space-y-3">{field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}</div>
     return <p className="text-sm text-gray-400 text-center py-6">Sin campos para esta etapa</p>
   }
 
