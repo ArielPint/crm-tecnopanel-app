@@ -4,10 +4,7 @@ export type RolUsuario =
 
 export type TipoVenta = 'Proyecto' | 'Producto' | 'Kit'
 
-export type EtapaOportunidad =
-  | 'ClasificaciÃ³n' | 'IngenierÃ­a' | 'CubicaciÃ³n' | 'Presupuestos'
-  | 'RevisiÃ³n Vendedor' | 'RevisiÃ³n Cliente' | 'EvaluaciÃ³n Crediticia'
-  | 'Ganado' | 'Perdido'
+export type EtapaOportunidad = string
 
 export type EstadoTarea = 'pendiente' | 'en_progreso' | 'completada' | 'rechazada'
 export type ResultadoCredito = 'aprobado' | 'rechazado' | 'observado' | 'pendiente'
@@ -55,7 +52,6 @@ export interface Oportunidad {
   descripcion: string | null
   created_at: string
   updated_at: string
-  // joins
   cliente?: Cliente
   vendedor?: Profile
 }
@@ -73,7 +69,6 @@ export interface TareaIngenieria {
   asignado?: Profile
 }
 
-// Tipo genÃ©rico de la base de datos para supabase-js
 export type Database = {
   public: {
     Tables: {
