@@ -13,13 +13,13 @@ export default function Credito(){
   const [sel,setSel]=useState<Oportunidad|null>(null)
 
   async function load(){
-    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Evaluacion Crediticia').order('updated_at',{ascending:false})
+    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Evaluación Crediticia').order('updated_at',{ascending:false})
     const base=(data as Oportunidad[])||[]
     if(!base.length){setOpps([]);setLoading(false);return}
     const ids=base.map(o=>o.id)
     const [{data:a},{data:h}]=await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario:profiles(nombre,apellido)').in('oportunidad_id',ids).eq('etapa','Evaluacion Crediticia'),
-      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Evaluacion Crediticia').is('fecha_salida',null),
+      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario:profiles(nombre,apellido)').in('oportunidad_id',ids).eq('etapa','Evaluación Crediticia'),
+      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Evaluación Crediticia').is('fecha_salida',null),
     ])
     const am:Record<string,{nombre:string;apellido:string}>={}
     const dm:Record<string,number>={}
