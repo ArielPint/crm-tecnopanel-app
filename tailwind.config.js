@@ -6,10 +6,10 @@ export default {
     extend: {
       colors: {
         brand: {
-          red:   '#ed3224',
-          dark:  '#c0241a',
-          gray:  '#424243',
-          bg:    '#1a1a1b',
+          red: '#ed3224',
+          dark: '#c0241a',
+          gray: '#424243',
+          bg: '#1a1a1b',
         },
       },
       borderRadius: {
@@ -19,5 +19,5 @@ export default {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [],
 }
