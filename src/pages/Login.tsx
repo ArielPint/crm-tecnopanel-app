@@ -1,85 +1,75 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 export default function Login() {
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]       = useState<string | null>(null)
+  const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
     setLoading(true)
-    const { error } = await signIn(email, password)
-    setLoading(false)
-    if (error) {
-      setError('Credenciales incorrectas. Verifica tu email y contraseÃ±a.')
-    } else {
-      navigate('/dashboard')
-    }
+    setError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { setError(error.message); setLoading(false) }
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: 'linear-gradient(135deg, #1a1a1b 0%, #3d0f0c 55%, #1a1a1b 100%)' }}
-    >
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+    <div className="min-h-screen flex items-center justify-center"
+         style={{ background: 'radial-gradient(ellipse at center, #3a0a08 0%, #1a0404 60%, #0d0101 100%)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <img src="/logo horizontal.jpeg" alt="TECNOPANEL" className="h-14 w-auto" />
+          <svg width="80" height="48" viewBox="0 0 120 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="20" width="12" height="52" fill="#ed3224"/>
+            <rect x="16" y="8" width="12" height="64" fill="#ed3224"/>
+            <rect x="32" y="0" width="12" height="72" fill="#ed3224"/>
+            <text x="50" y="32" fontFamily="Arial" fontWeight="bold" fontSize="18" fill="#424243">TECNO</text>
+            <text x="50" y="52" fontFamily="Arial" fontWeight="bold" fontSize="18" fill="#ed3224">PANEL</text>
+          </svg>
         </div>
 
-        <h1 className="text-lg font-semibold text-gray-700 text-center mb-6">
-          CRM Comercial
-        </h1>
+        <h1 className="text-center text-xl font-bold text-gray-800 mb-6">CRM Comercial</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Correo electrÃ³nico
+              Correo electronico
             </label>
             <input
               type="email"
-              required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               placeholder="usuario@tecnopanel.cl"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              ContraseÃ±a
+              Contrasena
             </label>
             <input
               type="password"
-              required
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
+              placeholder="••••••••"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full text-white font-semibold py-3 rounded-lg transition-colors text-sm disabled:opacity-60"
+            className="w-full py-2.5 rounded-lg text-white font-semibold text-sm transition-colors disabled:opacity-60"
             style={{ background: '#ed3224' }}
-            onMouseOver={e => (e.currentTarget.style.background = '#c0241a')}
-            onMouseOut={e => (e.currentTarget.style.background = '#ed3224')}
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
