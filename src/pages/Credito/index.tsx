@@ -31,11 +31,11 @@ export default function Credito(){
   if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
   return(
     <div className="flex flex-col h-full">
-      <div className="px-6 py-4 border-b border-gray-200 bg-white"><h1 className="text-lg font-bold text-gray-800">Evaluación Crediticia</h1><p className="text-xs text-gray-500">{opps.length} oportunidades</p></div>
       <div className="flex-1 overflow-auto p-6">
-        {opps.length===0?(<div className="flex flex-col items-center justify-center h-64 text-gray-400"><div className="text-5xl mb-3 opacity-20">💳</div><p className="text-sm">Sin oportunidades</p></div>):(
+        <p className="text-xs text-gray-500 mb-4">{opps.length} oportunidades</p>
+        {opps.length===0?(<div className="flex flex-col items-center justify-center h-64 text-gray-400"><p className="text-sm">Sin oportunidades en esta etapa</p></div>):(
           <div className="space-y-3 max-w-3xl">{opps.map(o=>(
-            <div key={o.id} onClick={()=>setSel(o)} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer">
+            <div key={o.id} onClick={()=>setSel(o)} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1"><span className="text-xs text-gray-400 font-mono">{o.codigo}</span><span className={'text-xs px-1.5 py-0.5 rounded-full font-medium '+(TC[o.tipo_venta]??'bg-gray-100 text-gray-600')}>{o.tipo_venta}</span></div>
@@ -43,14 +43,14 @@ export default function Credito(){
                   {o.cliente&&<p className="text-xs text-gray-500 mt-0.5">{(o.cliente as {razon_social:string}).razon_social}</p>}
                 </div>
                 <div className="text-right flex-shrink-0">
-                  {o.monto_estimado!=null&&<p className="text-sm font-bold" style={{color:'#ed3224'}}>{'$'+o.monto_estimado.toLocaleString('es-CL')}</p>}
+                  {o.monto_estimado!=null&&<p className="text-sm font-bold text-brand-red">{'$'+o.monto_estimado.toLocaleString('es-CL')}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">{o.probabilidad??0}%</p>
                   {o.dias!==undefined&&<div className="flex items-center justify-end gap-1 mt-1"><Clock size={10} className="text-gray-400"/><span className="text-xs text-gray-400">{o.dias}d</span></div>}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
-                {o.vendedor&&<p className="text-xs text-gray-400">Vendedor: {(o.vendedor as {nombre:string;apellido:string}).nombre} {(o.vendedor as {nombre:string;apellido:string}).apellido}</p>}
-                {o.asignado&&<p className="text-xs text-blue-500 font-medium flex items-center gap-1"><User size={10}/>{o.asignado.nombre} {o.asignado.apellido}</p>}
+              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                <p className="text-xs text-gray-400">Vendedor: {o.vendedor ? `${(o.vendedor as {nombre:string;apellido:string}).nombre} ${(o.vendedor as {nombre:string;apellido:string}).apellido}` : '—'}</p>
+                <p className="text-xs font-medium flex items-center gap-1 text-blue-500"><User size={10}/>{o.asignado ? `${o.asignado.nombre} ${o.asignado.apellido}` : 'Sin asignar'}</p>
               </div>
             </div>
           ))}</div>
