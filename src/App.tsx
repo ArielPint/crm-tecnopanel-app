@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { PermisosProvider } from '@/contexts/PermisosContext'
 import { AppLayout } from '@/components/Layout/AppLayout'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
@@ -46,8 +47,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+      <PermisosProvider>
         <AppRoutes />
-      </AuthProvider>
+      </PermisosProvider>
+    </AuthProvider>
     </BrowserRouter>
   )
 }
