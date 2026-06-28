@@ -46,14 +46,18 @@ function AppRoutes() {
   )
 }
 
+import { GlobalModalsProvider } from '@/contexts/GlobalModalsContext'
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-      <PermisosProvider>
-        <AppRoutes />
-      </PermisosProvider>
-    </AuthProvider>
+        <PermisosProvider>
+          <GlobalModalsProvider>
+            <AppRoutes />
+          </GlobalModalsProvider>
+        </PermisosProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

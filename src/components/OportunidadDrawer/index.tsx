@@ -122,6 +122,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         oportunidad_id: opp.id, etapa: opp.etapa_actual,
         usuario_id: userId, asignado_por: profile?.id,
       }, { onConflict: 'oportunidad_id,etapa' })
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        tipo: 'asignacion',
+        titulo: `Te asignaron: ${opp.nombre}`,
+        mensaje: `${opp.codigo} · etapa ${opp.etapa_actual}`,
+        oportunidad_id: opp.id,
+      })
     }
   }
 
@@ -134,6 +141,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     if (cur) await supabase.from('oportunidad_historial_etapas').update({ fecha_salida: new Date().toISOString(), usuario_id: profile?.id }).eq('id', (cur as {id:string}).id)
     await supabase.from('oportunidades').update({ etapa_actual: newEtapa, updated_at: new Date().toISOString() }).eq('id', opp.id)
     await supabase.from('oportunidad_historial_etapas').insert({ oportunidad_id: opp.id, etapa: newEtapa, fecha_entrada: new Date().toISOString(), usuario_id: profile?.id })
+    await supabase.from('notifications').insert({
+      user_id: profile?.id,
+      tipo: 'etapa_cambio',
+      titulo: `${opp.nombre} avanzó a ${newEtapa}`,
+      mensaje: `${opp.codigo} · de ${opp.etapa_actual} a ${newEtapa}`,
+      oportunidad_id: opp.id,
+    })
     setSaving(false); onUpdate(); onClose()
   }
 
@@ -143,6 +157,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     if (cur) await supabase.from('oportunidad_historial_etapas').update({ fecha_salida: new Date().toISOString(), usuario_id: profile?.id }).eq('id', (cur as {id:string}).id)
     await supabase.from('oportunidades').update({ etapa_actual: estado, updated_at: new Date().toISOString() }).eq('id', opp.id)
     await supabase.from('oportunidad_historial_etapas').insert({ oportunidad_id: opp.id, etapa: estado, fecha_entrada: new Date().toISOString(), usuario_id: profile?.id })
+    await supabase.from('notifications').insert({
+      user_id: profile?.id,
+      tipo: 'estado_final',
+      titulo: `${opp.nombre} marcada como ${estado}`,
+      mensaje: `${opp.codigo} · ${estado === 'Ganado' ? '✓ cerrada con éxito' : '✗ perdida'}`,
+      oportunidad_id: opp.id,
+    })
     setSaving(false); onUpdate(); onClose()
   }
 
