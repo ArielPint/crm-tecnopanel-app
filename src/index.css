@@ -5,10 +5,25 @@
 @layer base {
   :root {
     --radius: 0.5rem;
+
+    /* Brand */
+    --color-primary:   #ed3224;
+    --color-primary-dark: #c0241a;
+    --color-sidebar-bg: #1a1a1b;
+
+    /* Semantic */
+    --color-success: #059669;
+    --color-info:    #2563eb;
+    --color-warning: #f59e0b;
+
+    /* Text */
+    --color-text:     #374151;
+    --color-text-sub: #6b7280;
   }
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
+    color: var(--color-text);
   }
 }

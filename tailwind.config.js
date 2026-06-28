@@ -8,8 +8,14 @@ export default {
         brand: {
           red: '#ed3224',
           dark: '#c0241a',
-          gray: '#424243',
+          gray: '#374151',
           bg: '#1a1a1b',
+        },
+        semantic: {
+          success: '#059669',
+          info:    '#2563eb',
+          warning: '#f59e0b',
+          danger:  '#ed3224',
         },
       },
       borderRadius: {

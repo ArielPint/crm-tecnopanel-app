@@ -211,14 +211,14 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       <div key={key}>
         <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
         <input type={type} value={etapaData[key] ?? ''} onChange={ev => setEtapaData(d => ({...d,[key]:ev.target.value}))} placeholder={placeholder}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" />
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
       </div>
     )
     const ta = (key: string, label: string, placeholder = '') => (
       <div key={key}>
         <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
         <textarea value={etapaData[key] ?? ''} onChange={ev => setEtapaData(d => ({...d,[key]:ev.target.value}))} rows={3} placeholder={placeholder}
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" />
       </div>
     )
     if (e === 'Clasificación') return <div className="space-y-3">{ta('notas','Notas de clasificacion','Descripcion general, alcance...')}{field('origen_lead','Origen del lead','text','Referido, web, visita...')}{field('contacto_previo','Contacto previo','text','Si / No / Descripcion')}</div>
@@ -290,25 +290,25 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           ) : tab === 'general' ? (
             <div className="space-y-4">
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-                <input value={opp.nombre} onChange={e => setOpp(o => ({...o,nombre:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                <input value={opp.nombre} onChange={e => setOpp(o => ({...o,nombre:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Tipo venta</label>
-                  <select value={opp.tipo_venta} onChange={e => setOpp(o => ({...o,tipo_venta:e.target.value as 'Proyecto'|'Producto'|'Kit'}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                  <select value={opp.tipo_venta} onChange={e => setOpp(o => ({...o,tipo_venta:e.target.value as 'Proyecto'|'Producto'|'Kit'}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                     <option>Proyecto</option><option>Producto</option><option>Kit</option>
                   </select></div>
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Cierre estimado</label>
-                  <input type="date" value={opp.fecha_cierre_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_cierre_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                  <input type="date" value={opp.fecha_cierre_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_cierre_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Monto estimado (CLP)</label>
-                  <input type="number" value={opp.monto_estimado ?? ''} onChange={e => setOpp(o => ({...o,monto_estimado:e.target.value ? Number(e.target.value) : null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                  <input type="number" value={opp.monto_estimado ?? ''} onChange={e => setOpp(o => ({...o,monto_estimado:e.target.value ? Number(e.target.value) : null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Probabilidad: {opp.probabilidad}%</label>
                   <input type="range" min="0" max="100" step="5" value={opp.probabilidad} onChange={e => setOpp(o => ({...o,probabilidad:Number(e.target.value)}))} className="w-full mt-2" /></div>
               </div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Descripcion</label>
-                <textarea value={opp.descripcion ?? ''} onChange={e => setOpp(o => ({...o,descripcion:e.target.value||null}))} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" /></div>
+                <textarea value={opp.descripcion ?? ''} onChange={e => setOpp(o => ({...o,descripcion:e.target.value||null}))} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" /></div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Asignado a (etapa actual)</label>
-                <select value={asignadoId} onChange={e => saveAsignacion(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                <select value={asignadoId} onChange={e => saveAsignacion(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   <option value="">Sin asignar</option>
                   {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido} ({u.rol.replace(/_/g,' ')})</option>)}
                 </select></div>

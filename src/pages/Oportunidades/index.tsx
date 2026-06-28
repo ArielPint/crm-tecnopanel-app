@@ -75,9 +75,9 @@ export default function Oportunidades() {
         <div><h1 className="text-lg font-bold text-gray-800">Oportunidades</h1><p className="text-xs text-gray-500">{filtradas.length} en curso</p></div>
         <div className="flex-1 max-w-xs ml-4 relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar..." className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar..." className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
         </div>
-        <button onClick={() => setShowForm(true)} className="ml-auto flex items-center gap-2 text-white text-sm font-medium px-4 py-2 rounded-lg" style={{background:'#ed3224'}}>
+        <button onClick={() => setShowForm(true)} className="ml-auto flex items-center gap-2 bg-brand-red hover:bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           <Plus size={16} /> Nueva
         </button>
       </div>
@@ -104,7 +104,7 @@ export default function Oportunidades() {
                       </div>
                       <p className="text-sm font-semibold text-gray-800 leading-tight mb-1">{opp.nombre}</p>
                       {opp.cliente && <p className="text-xs text-gray-500 truncate">{opp.cliente.razon_social}</p>}
-                      {opp.monto_estimado != null && <p className="text-xs font-medium mt-2" style={{color:'#ed3224'}}>{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>}
+                      {opp.monto_estimado != null && <p className="text-xs font-medium mt-2 text-brand-red">{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>}
                       <div className="mt-2 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full bg-green-400" style={{width:(opp.probabilidad??0)+'%'}} /></div>
                     </div>
                   ))}
@@ -124,31 +124,31 @@ export default function Oportunidades() {
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Nombre *</label>
-                <input value={form.nombre} onChange={e => setForm(f=>({...f,nombre:e.target.value}))} required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                <input value={form.nombre} onChange={e => setForm(f=>({...f,nombre:e.target.value}))} required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
-                <select value={form.cliente_id} onChange={e => setForm(f=>({...f,cliente_id:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                <select value={form.cliente_id} onChange={e => setForm(f=>({...f,cliente_id:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   <option value="">Sin cliente</option>{clientes.map(c=><option key={c.id} value={c.id}>{c.razon_social}</option>)}
                 </select></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                  <select value={form.tipo_venta} onChange={e => setForm(f=>({...f,tipo_venta:e.target.value as TipoVenta}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                  <select value={form.tipo_venta} onChange={e => setForm(f=>({...f,tipo_venta:e.target.value as TipoVenta}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                     <option>Proyecto</option><option>Producto</option><option>Kit</option>
                   </select></div>
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Etapa inicial</label>
-                  <select value={form.etapa_actual} onChange={e => setForm(f=>({...f,etapa_actual:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                  <select value={form.etapa_actual} onChange={e => setForm(f=>({...f,etapa_actual:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                     {ETAPAS.map(e=><option key={e} value={e}>{e}</option>)}
                   </select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Monto (CLP)</label>
-                  <input type="number" value={form.monto_estimado} onChange={e => setForm(f=>({...f,monto_estimado:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                  <input type="number" value={form.monto_estimado} onChange={e => setForm(f=>({...f,monto_estimado:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Cierre est.</label>
-                  <input type="date" value={form.fecha_cierre_est} onChange={e => setForm(f=>({...f,fecha_cierre_est:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300" /></div>
+                  <input type="date" value={form.fecha_cierre_est} onChange={e => setForm(f=>({...f,fecha_cierre_est:e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
               </div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Probabilidad: {form.probabilidad}%</label>
                 <input type="range" min="0" max="100" step="5" value={form.probabilidad} onChange={e => setForm(f=>({...f,probabilidad:e.target.value}))} className="w-full" /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Descripcion</label>
-                <textarea value={form.descripcion} onChange={e => setForm(f=>({...f,descripcion:e.target.value}))} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" /></div>
+                <textarea value={form.descripcion} onChange={e => setForm(f=>({...f,descripcion:e.target.value}))} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" /></div>
               {formError && <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{formError}</p>}
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>

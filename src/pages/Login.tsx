@@ -55,7 +55,7 @@ export default function Login() {
               onChange={e => setEmail(e.target.value)}
               placeholder="usuario@tecnopanel.cl"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
             />
           </div>
 
@@ -69,7 +69,7 @@ export default function Login() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"
             />
           </div>
 
@@ -80,8 +80,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg text-white font-semibold text-sm transition-colors disabled:opacity-60"
-            style={{ background: '#ed3224' }}
+            className="w-full py-2.5 rounded-lg bg-brand-red hover:bg-brand-dark text-white font-semibold text-sm transition-colors disabled:opacity-60"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>

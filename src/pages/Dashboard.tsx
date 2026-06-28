@@ -10,8 +10,9 @@ const ETAPAS = [
   'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
 ]
 
+// Rampa monocromática: del rojo de marca desaturado (inicio) al rojo saturado (final)
 const ETAPA_COLORS = [
-  '#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'
+  '#fca5a5','#f87171','#ef4444','#dc2626','#c0241a','#a31c13','#ed3224'
 ]
 
 function formatCLP(n: number) {
@@ -76,12 +77,12 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total oportunidades', value: loading ? '-' : String(stats.total), color: '#424243', bg: '#f9fafb' },
-          { label: 'En curso', value: loading ? '-' : String(stats.activas), color: '#ed3224', bg: '#fff5f5' },
-          { label: 'Ganadas', value: loading ? '-' : String(stats.ganadas), color: '#059669', bg: '#f0fdf4' },
-          { label: 'Monto estimado', value: loading ? '-' : formatCLP(stats.monto), color: '#7c3aed', bg: '#faf5ff' },
+          { label: 'Total oportunidades', value: loading ? '-' : String(stats.total),    color: 'var(--color-text)' },
+          { label: 'En curso',            value: loading ? '-' : String(stats.activas),  color: 'var(--color-primary)' },
+          { label: 'Ganadas',             value: loading ? '-' : String(stats.ganadas),  color: 'var(--color-success)' },
+          { label: 'Monto estimado',      value: loading ? '-' : formatCLP(stats.monto), color: 'var(--color-info)' },
         ].map(k => (
-          <div key={k.label} className="rounded-xl border border-gray-200 p-4" style={{ background: k.bg }}>
+          <div key={k.label} className="rounded-xl border border-gray-200 bg-white p-4">
             <p className="text-2xl font-bold" style={{ color: k.color }}>{k.value}</p>
             <p className="text-xs text-gray-500 mt-1">{k.label}</p>
           </div>
@@ -121,8 +122,7 @@ export default function Dashboard() {
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Tiempo promedio por etapa (días)</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {ETAPAS.map((etapa, i) => avgDias[etapa] !== undefined && (
-              <div key={etapa} className="rounded-lg p-3 text-center"
-                style={{ background: ETAPA_COLORS[i] + '18', border: `1px solid ${ETAPA_COLORS[i]}40` }}>
+              <div key={etapa} className="rounded-lg p-3 text-center bg-red-50 border border-red-100">
                 <p className="text-xl font-bold" style={{ color: ETAPA_COLORS[i] }}>{avgDias[etapa]}</p>
                 <p className="text-xs text-gray-500 mt-0.5 truncate">{etapa}</p>
               </div>

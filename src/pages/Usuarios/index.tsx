@@ -162,13 +162,13 @@ export default function Usuarios(){
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Nuevo usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={form.apellido} onChange={e=>setForm(f=>({...f,apellido:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
-              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-              <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+              <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
-                <select value={form.rol} onChange={e=>setForm(f=>({...f,rol:e.target.value as Rol}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                <select value={form.rol} onChange={e=>setForm(f=>({...f,rol:e.target.value as Rol}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
                 </select>
               </div>
@@ -187,11 +187,11 @@ export default function Usuarios(){
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Editar usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e=>setEditing(ed=>ed?{...ed,nombre:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
-                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e=>setEditing(ed=>ed?{...ed,apellido:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Nombre</label><input value={editing.nombre} onChange={e=>setEditing(ed=>ed?{...ed,nombre:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
+                <div><label className="text-xs font-medium text-gray-600 block mb-1">Apellido</label><input value={editing.apellido} onChange={e=>setEditing(ed=>ed?{...ed,apellido:e.target.value}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               </div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
-                <select value={editing.rol} onChange={e=>setEditing(ed=>ed?{...ed,rol:e.target.value as Rol}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
+                <select value={editing.rol} onChange={e=>setEditing(ed=>ed?{...ed,rol:e.target.value as Rol}:null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   {ROLES.map(r=><option key={r} value={r}>{ROL_LABEL[r]}</option>)}
                 </select>
               </div>
