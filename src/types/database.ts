@@ -56,6 +56,50 @@ export interface Oportunidad {
   vendedor?: Profile
 }
 
+export interface OportunidadHistorialEtapa {
+  id: string
+  oportunidad_id: string
+  etapa: string
+  usuario_id: string | null
+  fecha_entrada: string
+  fecha_salida: string | null
+  notas: string | null
+  usuario?: Profile
+}
+
+export interface OportunidadAsignacion {
+  id: string
+  oportunidad_id: string
+  etapa: string
+  usuario_id: string
+  asignado_por: string | null
+  created_at: string
+  usuario?: Profile
+}
+
+export interface OportunidadDocumento {
+  id: string
+  oportunidad_id: string
+  nombre: string
+  tipo: 'archivo' | 'link'
+  url: string
+  extension: string | null
+  tamanio_bytes: number | null
+  subido_por: string | null
+  etapa: string | null
+  created_at: string
+  subido_por_profile?: Profile
+}
+
+export interface OportunidadDatosEtapa {
+  id: string
+  oportunidad_id: string
+  etapa: string
+  datos: Record<string, unknown>
+  updated_by: string | null
+  updated_at: string
+}
+
 export interface TareaIngenieria {
   id: string
   oportunidad_id: string
@@ -72,16 +116,20 @@ export interface TareaIngenieria {
 export type Database = {
   public: {
     Tables: {
-      profiles:              { Row: Profile }
-      clientes:              { Row: Cliente }
-      oportunidades:         { Row: Oportunidad }
-      tareas_ingenieria:     { Row: TareaIngenieria }
+      profiles: { Row: Profile }
+      clientes: { Row: Cliente }
+      oportunidades: { Row: Oportunidad }
+      tareas_ingenieria: { Row: TareaIngenieria }
+      oportunidad_historial_etapas: { Row: OportunidadHistorialEtapa }
+      oportunidad_asignaciones: { Row: OportunidadAsignacion }
+      oportunidad_documentos: { Row: OportunidadDocumento }
+      oportunidad_datos_etapa: { Row: OportunidadDatosEtapa }
     }
     Enums: {
-      rol_usuario:       RolUsuario
-      tipo_venta:        TipoVenta
+      rol_usuario: RolUsuario
+      tipo_venta: TipoVenta
       etapa_oportunidad: EtapaOportunidad
-      estado_tarea:      EstadoTarea
+      estado_tarea: EstadoTarea
     }
   }
 }
