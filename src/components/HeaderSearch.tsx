@@ -14,11 +14,10 @@ interface Result {
 const ETAPA_DOT: Record<string, string> = {
   'Clasificación': '#64748b',
   'Ingeniería': '#3b82f6',
-  'Cubicación': '#8b5cf6',
-  'Presupuestos': '#f97316',
+  'Desarrollo': '#8b5cf6',
+  'Costos y Presupuestos': '#f97316',
   'Revisión Vendedor': '#f59e0b',
-  'Revisión Cliente': '#fb923c',
-  'Evaluación Crediticia': '#ef4444',
+  'Negociación': '#ef4444',
 }
 
 function fmtM(n: number | null) {

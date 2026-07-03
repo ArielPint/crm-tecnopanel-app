@@ -5,24 +5,29 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Oportunidad, OportunidadHistorialEtapa } from '@/types/database'
 
 const ETAPAS = [
-  'Clasificación','Ingeniería','Cubicación','Presupuestos',
-  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
+  'Clasificación','Ingeniería','Desarrollo','Costos y Presupuestos',
+  'Revisión Vendedor','Negociación',
 ]
 
 const ETAPA_COLORS: Record<string, string> = {
-  'Clasificación':        '#64748b',
-  'Ingeniería':           '#3b82f6',
-  'Cubicación':           '#8b5cf6',
-  'Presupuestos':         '#f97316',
-  'Revisión Vendedor':    '#f59e0b',
-  'Revisión Cliente':     '#fb923c',
-  'Evaluación Crediticia':'#ef4444',
+  'Clasificación':          '#64748b',
+  'Ingeniería':             '#3b82f6',
+  'Desarrollo':             '#8b5cf6',
+  'Costos y Presupuestos':  '#f97316',
+  'Revisión Vendedor':      '#f59e0b',
+  'Negociación':            '#ef4444',
 }
 
 const TIPO_COLOR: Record<string,string> = {
   Proyecto: 'bg-purple-100 text-purple-700',
   Producto: 'bg-blue-100 text-blue-700',
   Kit: 'bg-amber-100 text-amber-700',
+}
+
+const TIPO_VENTA_LABELS: Record<string, string> = {
+  Proyecto: 'Proyecto',
+  Producto: 'Venta Directa',
+  Kit: 'Viviendas Industrializadas',
 }
 
 interface Notif {
@@ -329,7 +334,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${TIPO_COLOR[o.tipo_venta] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {o.tipo_venta}
+                        {TIPO_VENTA_LABELS[o.tipo_venta] ?? o.tipo_venta}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
