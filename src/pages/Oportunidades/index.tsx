@@ -6,8 +6,8 @@ import OportunidadDrawer from '@/components/OportunidadDrawer'
 import NuevaOportunidadModal from '@/components/NuevaOportunidadModal'
 
 const ETAPAS: EtapaOportunidad[] = [
-  'Clasificación','Ingeniería','Cubicación','Presupuestos',
-  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
+  'Clasificación','Ingeniería','Desarrollo','Costos y Presupuestos',
+  'Revisión Vendedor','Negociación',
 ]
 
 const TIPO_COLOR: Record<TipoVenta, string> = {
@@ -15,6 +15,14 @@ const TIPO_COLOR: Record<TipoVenta, string> = {
   Producto: 'bg-blue-100 text-blue-700',
   Kit: 'bg-amber-100 text-amber-700',
 }
+
+const TIPO_VENTA_LABELS: Record<TipoVenta, string> = {
+  Proyecto: 'Proyecto',
+  Producto: 'Venta Directa',
+  Kit: 'Viviendas Industrializadas',
+}
+
+function formatMM(n: number) { return (n / 1_000_000).toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MM' }
 
 export default function Oportunidades() {
   const [oportunidades, setOportunidades] = useState<Oportunidad[]>([])
@@ -73,13 +81,18 @@ export default function Oportunidades() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-gray-400 font-mono">{opp.codigo}</span>
-                        <span className={'text-xs px-1.5 py-0.5 rounded-full font-medium ' + TIPO_COLOR[opp.tipo_venta]}>{opp.tipo_venta}</span>
+                        <span className={'text-xs px-1.5 py-0.5 rounded-full font-medium ' + TIPO_COLOR[opp.tipo_venta]}>{TIPO_VENTA_LABELS[opp.tipo_venta] ?? opp.tipo_venta}</span>
                       </div>
                       <p className="text-sm font-semibold text-gray-800 leading-tight">{opp.nombre}</p>
                       {opp.cliente && <p className="text-xs text-gray-500 mt-0.5 truncate">{opp.cliente.razon_social}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      {opp.monto_estimado != null && <p className="text-sm font-bold text-brand-red">{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>}
+                      {opp.monto_estimado != null && (
+                        <>
+                          <p className="text-sm font-bold text-brand-red">{'$' + opp.monto_estimado.toLocaleString('es-CL')}</p>
+                          <p className="text-[10px] text-gray-400">{formatMM(opp.monto_estimado)}</p>
+                        </>
+                      )}
                       <p className="text-xs text-gray-400 mt-0.5">{opp.probabilidad ?? 0}%</p>
                     </div>
                   </div>

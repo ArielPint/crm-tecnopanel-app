@@ -5,13 +5,67 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { TipoVenta } from '@/types/database'
 
 interface Cliente { id: string; razon_social: string }
+
+const TIPO_VENTA_LABELS: Record<TipoVenta, string> = {
+  Proyecto: 'Proyecto',
+  Producto: 'Venta Directa',
+  Kit: 'Viviendas Industrializadas',
+}
+
+// Etapa inicial forzada segun tipo de venta: Proyecto entra por Clasificacion;
+// Producto (Venta Directa) y Kit (Viviendas Industrializadas) entran directo a
+// Costos y Presupuestos, ya que esa etapa fusiona lo que antes eran Cubicacion y Presupuestos.
+const ETAPA_INICIAL_POR_TIPO: Record<TipoVenta, string> = {
+  Proyecto: 'Clasificación',
+  Producto: 'Costos y Presupuestos',
+  Kit: 'Costos y Presupuestos',
+}
+
+const FAMILIA_PRODUCTOS_OPCIONES = ['TecnoPanel', 'TecnoTruss', 'TecnoFrame', 'Escaleras'] as const
+
+// Subconjunto de regiones/comunas de Chile, pensado para ser facil de ampliar.
+const REGIONES_COMUNAS: Record<string, string[]> = {
+  'Región Metropolitana': ['Santiago', 'Puente Alto', 'Maipú', 'La Florida', 'Las Condes', 'San Bernardo', 'Colina', 'Melipilla'],
+  'Valparaíso': ['Valparaíso', 'Viña del Mar', 'Quilpué', 'San Antonio', 'Los Andes', 'Quillota'],
+  'Biobío': ['Concepción', 'Talcahuano', 'Los Ángeles', 'Chillán', 'Coronel'],
+  'Maule': ['Talca', 'Curicó', 'Linares', 'Constitución'],
+  'Araucanía': ['Temuco', 'Villarrica', 'Angol', 'Padre Las Casas'],
+  'Los Lagos': ['Puerto Montt', 'Osorno', 'Castro', 'Puerto Varas'],
+  'Antofagasta': ['Antofagasta', 'Calama', 'Tocopilla'],
+  'Coquimbo': ['La Serena', 'Coquimbo', 'Ovalle'],
+  "O'Higgins": ['Rancagua', 'San Fernando', 'Rengo'],
+  'Los Ríos': ['Valdivia', 'La Unión'],
+  'Ñuble': ['Chillán', 'San Carlos'],
+  'Tarapacá': ['Iquique', 'Alto Hospicio'],
+  'Atacama': ['Copiapó', 'Vallenar'],
+  'Magallanes': ['Punta Arenas', 'Puerto Natales'],
+  'Aysén': ['Coyhaique', 'Puerto Aysén'],
+  'Arica y Parinacota': ['Arica', 'Putre'],
+}
+const REGIONES = Object.keys(REGIONES_COMUNAS)
+
 interface FormData {
   nombre: string; cliente_id: string; tipo_venta: TipoVenta;
-  monto_estimado: string; probabilidad: string; etapa_actual: string;
+  monto_estimado: string; probabilidad: string;
   fecha_cierre_est: string; descripcion: string;
+  nombre_entidad_patrocinante: string;
+  region: string; comuna: string;
+  cantidad_casas: string; cantidad_tipos_casas: string;
+  fecha_adjudicacion_est: string; fecha_inicio_despachos_est: string;
+  duracion_meses_est: string;
+  familia_productos: string[];
 }
-const INIT: FormData = { nombre:'', cliente_id:'', tipo_venta:'Proyecto', monto_estimado:'', probabilidad:'50', etapa_actual:'Clasificación', fecha_cierre_est:'', descripcion:'' }
-const ETAPAS = ['Clasificación','Ingeniería','Cubicación','Presupuestos','Revisión Vendedor','Revisión Cliente','Evaluación Crediticia']
+const INIT: FormData = {
+  nombre:'', cliente_id:'', tipo_venta:'Proyecto',
+  monto_estimado:'', probabilidad:'50',
+  fecha_cierre_est:'', descripcion:'',
+  nombre_entidad_patrocinante:'',
+  region:'', comuna:'',
+  cantidad_casas:'', cantidad_tipos_casas:'',
+  fecha_adjudicacion_est:'', fecha_inicio_despachos_est:'',
+  duracion_meses_est:'',
+  familia_productos: [],
+}
 function genCodigo() { const d=new Date(); return 'OPP-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'-'+(crypto.getRandomValues(new Uint16Array(1))[0]%9000+1000) }
 
 interface Props { isOpen: boolean; onClose: () => void; onSuccess: () => void }
@@ -20,35 +74,74 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
   const { profile } = useAuth()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [form, setForm] = useState<FormData>(INIT)
+  const [archivo, setArchivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
-    setForm(INIT); setError('')
+    setForm(INIT); setError(''); setArchivo(null)
     supabase.from('clientes').select('id,razon_social').order('razon_social')
       .then(({ data }) => setClientes((data as Cliente[]) ?? []))
   }, [isOpen])
 
+  const comunasDisponibles = form.region ? (REGIONES_COMUNAS[form.region] ?? []) : []
+  const etapaInicial = ETAPA_INICIAL_POR_TIPO[form.tipo_venta]
+
+  function toggleFamiliaProducto(valor: string) {
+    setForm(f => ({
+      ...f,
+      familia_productos: f.familia_productos.includes(valor)
+        ? f.familia_productos.filter(v => v !== valor)
+        : [...f.familia_productos, valor],
+    }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.nombre.trim()) return setError('El nombre es requerido')
+    if (form.comuna && form.region && !comunasDisponibles.includes(form.comuna)) {
+      return setError('La comuna seleccionada no pertenece a la región elegida')
+    }
     setSaving(true); setError('')
     const codigo = genCodigo()
     const { data, error: err } = await supabase.from('oportunidades').insert({
       codigo, nombre: form.nombre.trim(), cliente_id: form.cliente_id || null,
       vendedor_id: profile?.id ?? null, tipo_venta: form.tipo_venta,
       monto_estimado: form.monto_estimado ? Number(form.monto_estimado) : null,
-      probabilidad: Number(form.probabilidad), etapa_actual: form.etapa_actual,
+      probabilidad: Number(form.probabilidad), etapa_actual: etapaInicial,
       fecha_cierre_est: form.fecha_cierre_est || null, descripcion: form.descripcion || null,
+      nombre_entidad_patrocinante: form.tipo_venta === 'Kit' ? (form.nombre_entidad_patrocinante.trim() || null) : null,
+      region: form.region || null, comuna: form.comuna || null,
+      cantidad_casas: form.cantidad_casas ? Number(form.cantidad_casas) : null,
+      cantidad_tipos_casas: form.cantidad_tipos_casas ? Number(form.cantidad_tipos_casas) : null,
+      fecha_adjudicacion_est: form.fecha_adjudicacion_est || null,
+      fecha_inicio_despachos_est: form.fecha_inicio_despachos_est || null,
+      duracion_meses_est: form.duracion_meses_est ? Number(form.duracion_meses_est) : null,
+      familia_productos: form.familia_productos.length ? form.familia_productos : null,
     }).select('id').single()
     if (err) { setError(err.message); setSaving(false); return }
+    const oportunidadId = (data as { id: string })?.id ?? null
+
+    if (archivo && oportunidadId) {
+      const ext = archivo.name.split('.').pop() ?? ''
+      const path = oportunidadId + '/' + Date.now() + '-' + archivo.name
+      const { error: upErr } = await supabase.storage.from('oportunidades').upload(path, archivo)
+      if (!upErr) {
+        await supabase.from('oportunidad_documentos').insert({
+          oportunidad_id: oportunidadId, nombre: archivo.name, tipo: 'archivo',
+          url: path, extension: ext, tamanio_bytes: archivo.size,
+          subido_por: profile?.id, etapa: 'Clasificación',
+        })
+      }
+    }
+
     await supabase.from('notifications').insert({
       user_id: profile?.id,
       tipo: 'oportunidad_nueva',
       titulo: `Nueva oportunidad: ${form.nombre.trim()}`,
-      mensaje: `${codigo} · etapa inicial: ${form.etapa_actual}`,
-      oportunidad_id: (data as { id: string })?.id ?? null,
+      mensaje: `${codigo} · etapa inicial: ${etapaInicial}`,
+      oportunidad_id: oportunidadId,
     })
     setSaving(false); onSuccess(); onClose()
   }
@@ -80,17 +173,25 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
               <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
               <select value={form.tipo_venta} onChange={e => setForm(f=>({...f,tipo_venta:e.target.value as TipoVenta}))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                <option>Proyecto</option><option>Producto</option><option>Kit</option>
+                <option value="Proyecto">{TIPO_VENTA_LABELS.Proyecto}</option>
+                <option value="Producto">{TIPO_VENTA_LABELS.Producto}</option>
+                <option value="Kit">{TIPO_VENTA_LABELS.Kit}</option>
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Etapa inicial</label>
-              <select value={form.etapa_actual} onChange={e => setForm(f=>({...f,etapa_actual:e.target.value}))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                {ETAPAS.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
+              <input disabled value={etapaInicial} className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg text-sm" />
             </div>
           </div>
+
+          {form.tipo_venta === 'Kit' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Nombre entidad patrocinante</label>
+              <input value={form.nombre_entidad_patrocinante} onChange={e => setForm(f=>({...f,nombre_entidad_patrocinante:e.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Monto estimado (CLP)</label>
@@ -103,6 +204,77 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Región</label>
+              <select value={form.region} onChange={e => setForm(f=>({...f,region:e.target.value,comuna:''}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                <option value="">Sin región</option>
+                {REGIONES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Comuna</label>
+              <select value={form.comuna} onChange={e => setForm(f=>({...f,comuna:e.target.value}))} disabled={!form.region}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red disabled:bg-gray-50 disabled:text-gray-400">
+                <option value="">{form.region ? 'Sin comuna' : 'Elige una región primero'}</option>
+                {comunasDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad de casas</label>
+              <input type="number" min="0" value={form.cantidad_casas} onChange={e => setForm(f=>({...f,cantidad_casas:e.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Cantidad de tipos de casas</label>
+              <input type="number" min="0" value={form.cantidad_tipos_casas} onChange={e => setForm(f=>({...f,cantidad_tipos_casas:e.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha estimada de adjudicación</label>
+              <input type="date" value={form.fecha_adjudicacion_est} onChange={e => setForm(f=>({...f,fecha_adjudicacion_est:e.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha estimada inicio despachos</label>
+              <input type="date" value={form.fecha_inicio_despachos_est} onChange={e => setForm(f=>({...f,fecha_inicio_despachos_est:e.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Duración estimada del proyecto (meses)</label>
+            <input type="number" min="0" value={form.duracion_meses_est} onChange={e => setForm(f=>({...f,duracion_meses_est:e.target.value}))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Familia de productos a cotizar</label>
+            <div className="flex flex-wrap gap-3">
+              {FAMILIA_PRODUCTOS_OPCIONES.map(opcion => (
+                <label key={opcion} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <input type="checkbox" checked={form.familia_productos.includes(opcion)} onChange={() => toggleFamiliaProducto(opcion)}
+                    className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                  {opcion}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Plano (PDF / DWG / Autocad)</label>
+            <input type="file" accept=".pdf,.dwg,.dxf" onChange={e => setArchivo(e.target.files?.[0] ?? null)}
+              className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-xs file:font-medium file:bg-gray-50 hover:file:bg-gray-100" />
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Probabilidad: {form.probabilidad}%</label>
             <input type="range" min="0" max="100" step="5" value={form.probabilidad}

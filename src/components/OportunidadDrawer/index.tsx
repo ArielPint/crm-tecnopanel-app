@@ -5,18 +5,17 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Oportunidad, Profile, OportunidadHistorialEtapa, OportunidadDocumento } from '@/types/database'
 
 const ETAPAS_ORDER = [
-  'Clasificación','Ingeniería','Cubicación','Presupuestos',
-  'Revisión Vendedor','Revisión Cliente','Evaluación Crediticia',
+  'Clasificación','Ingeniería','Desarrollo','Costos y Presupuestos',
+  'Revisión Vendedor','Negociación',
 ]
 
 const ETAPAS_LABELS: Record<string,string> = {
   'Clasificación': 'Clasificación',
   'Ingeniería': 'Ingeniería',
-  'Cubicación': 'Cubicación',
-  'Presupuestos': 'Presupuestos',
+  'Desarrollo': 'Desarrollo',
+  'Costos y Presupuestos': 'Costos y Presupuestos',
   'Revisión Vendedor': 'Revisión Vendedor',
-  'Revisión Cliente': 'Revisión Cliente',
-  'Evaluación Crediticia': 'Evaluación Crediticia',
+  'Negociación': 'Negociación',
 }
 
 const TIPO_COLOR: Record<string, string> = {
@@ -25,17 +24,23 @@ const TIPO_COLOR: Record<string, string> = {
   Kit: 'bg-amber-100 text-amber-700',
 }
 
+const TIPO_VENTA_LABELS: Record<string, string> = {
+  Proyecto: 'Proyecto',
+  Producto: 'Venta Directa',
+  Kit: 'Viviendas Industrializadas',
+}
+
 const STAGE_ROLES: Record<string, string[]> = {
   'Clasificación': ['admin','gerente_ventas','vendedor'],
   'Ingeniería': ['admin','jefe_ingenieria','ingeniero'],
-  'Cubicación': ['admin','cubicador'],
-  'Presupuestos': ['admin','presupuestista'],
+  'Desarrollo': ['admin','jefe_ingenieria','desarrollador'],
+  'Costos y Presupuestos': ['admin','cubicador','presupuestista'],
   'Revisión Vendedor': ['admin','gerente_ventas','vendedor'],
-  'Revisión Cliente': ['admin','gerente_ventas','vendedor'],
-  'Evaluación Crediticia': ['admin','finanzas'],
+  'Negociación': ['admin','gerente_ventas','vendedor','finanzas'],
 }
 
 function formatCLP(n: number) { return '$' + n.toLocaleString('es-CL') }
+function formatMM(n: number) { return (n / 1_000_000).toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MM' }
 function diffDias(from: string) {
   return Math.floor((new Date().getTime() - new Date(from).getTime()) / 86400000)
 }
@@ -133,9 +138,8 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   }
 
   async function avanzarEtapa() {
-    const etapas = ['Clasificación','Ingeniería','Cubicación','Presupuestos','Revisión Vendedor','Revisión Cliente','Evaluación Crediticia']
-    const idx = etapas.indexOf(opp.etapa_actual)
-    const newEtapa = idx >= 0 && idx < etapas.length - 1 ? etapas[idx + 1] : 'Ganado'
+    const idx = ETAPAS_ORDER.indexOf(opp.etapa_actual)
+    const newEtapa = idx >= 0 && idx < ETAPAS_ORDER.length - 1 ? ETAPAS_ORDER[idx + 1] : 'Ganado'
     setSaving(true)
     const { data: cur } = await supabase.from('oportunidad_historial_etapas').select('id').eq('oportunidad_id', opp.id).eq('etapa', opp.etapa_actual).is('fecha_salida', null).maybeSingle()
     if (cur) await supabase.from('oportunidad_historial_etapas').update({ fecha_salida: new Date().toISOString(), usuario_id: profile?.id }).eq('id', (cur as {id:string}).id)
@@ -145,6 +149,25 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       user_id: profile?.id,
       tipo: 'etapa_cambio',
       titulo: `${opp.nombre} avanzó a ${newEtapa}`,
+      mensaje: `${opp.codigo} · de ${opp.etapa_actual} a ${newEtapa}`,
+      oportunidad_id: opp.id,
+    })
+    setSaving(false); onUpdate(); onClose()
+  }
+
+  async function retrocederEtapa() {
+    const idx = ETAPAS_ORDER.indexOf(opp.etapa_actual)
+    if (idx <= 0) return
+    const newEtapa = ETAPAS_ORDER[idx - 1]
+    setSaving(true)
+    const { data: cur } = await supabase.from('oportunidad_historial_etapas').select('id').eq('oportunidad_id', opp.id).eq('etapa', opp.etapa_actual).is('fecha_salida', null).maybeSingle()
+    if (cur) await supabase.from('oportunidad_historial_etapas').update({ fecha_salida: new Date().toISOString(), usuario_id: profile?.id }).eq('id', (cur as {id:string}).id)
+    await supabase.from('oportunidades').update({ etapa_actual: newEtapa, updated_at: new Date().toISOString() }).eq('id', opp.id)
+    await supabase.from('oportunidad_historial_etapas').insert({ oportunidad_id: opp.id, etapa: newEtapa, fecha_entrada: new Date().toISOString(), usuario_id: profile?.id })
+    await supabase.from('notifications').insert({
+      user_id: profile?.id,
+      tipo: 'etapa_cambio',
+      titulo: `${opp.nombre} retrocedió a ${newEtapa}`,
       mensaje: `${opp.codigo} · de ${opp.etapa_actual} a ${newEtapa}`,
       oportunidad_id: opp.id,
     })
@@ -219,12 +242,15 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  const etapas = ['Clasificación','Ingeniería','Cubicación','Presupuestos','Revisión Vendedor','Revisión Cliente','Evaluación Crediticia']
+  const etapas = ETAPAS_ORDER
   const currentIdx = etapas.indexOf(opp.etapa_actual)
   const isTerminal = ['Ganado','Perdido'].includes(opp.etapa_actual)
   const nextEtapa = currentIdx >= 0 && currentIdx < etapas.length - 1 ? etapas[currentIdx + 1] : 'Ganado'
   const allowedRoles = STAGE_ROLES[opp.etapa_actual] ?? []
   const filteredUsers = usuarios.filter(u => allowedRoles.includes(u.rol))
+  // Mismo control de rol para Avanzar y Retroceder: ambas son acciones de gestión de la etapa actual.
+  const canManageStage = !profile?.rol || allowedRoles.length === 0 || allowedRoles.includes(profile.rol)
+  const canGoBack = currentIdx > 0 && !isTerminal
 
   function renderEtapaForm() {
     const e = opp.etapa_actual
@@ -252,11 +278,39 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         {ta('observaciones_tecnicas','Observaciones tecnicas','Notas de ingenieria, restricciones...')}
       </div>
     )
-    if (e === 'Cubicación') return <div className="space-y-3">{field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones','')}</div>
-    if (e === 'Presupuestos') return <div className="space-y-3">{field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('margen_porcentaje','Margen (%)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}</div>
+    if (e === 'Desarrollo') return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de documento entregado</label>
+          <select value={etapaData['tipo_documento'] ?? ''} onChange={ev => setEtapaData(d => ({...d,tipo_documento:ev.target.value}))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+            <option value="">Seleccionar...</option>
+            <option value="Plano">Plano</option>
+            <option value="Ficha">Ficha</option>
+          </select>
+        </div>
+        {ta('notas_desarrollo','Notas','Observaciones sobre la entrega. El archivo se sube en la pestaña Docs.')}
+      </div>
+    )
+    if (e === 'Costos y Presupuestos') return (
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cubicación</p>
+        {field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones cubicación','')}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Presupuesto</p>
+        {field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('margen_porcentaje','Margen (%)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}
+      </div>
+    )
     if (e === 'Revisión Vendedor') return <div className="space-y-3">{field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}</div>
-    if (e === 'Revisión Cliente') return <div className="space-y-3">{ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}</div>
-    if (e === 'Evaluación Crediticia') return <div className="space-y-3">{field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}</div>
+    if (e === 'Negociación') return (
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revisión del cliente</p>
+        {ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Evaluación crediticia</p>
+        {field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cierre</p>
+        {ta('motivo_perdida','Motivo de pérdida (si aplica)','Solo relevante si la oportunidad se marca como Perdido')}
+      </div>
+    )
     return <p className="text-sm text-gray-400 text-center py-6">Sin campos para esta etapa</p>
   }
 
@@ -271,12 +325,17 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-xs font-mono text-gray-400">{opp.codigo}</span>
-                <span className={['text-xs px-2 py-0.5 rounded-full font-medium', TIPO_COLOR[opp.tipo_venta] ?? 'bg-gray-100 text-gray-600'].join(' ')}>{opp.tipo_venta}</span>
+                <span className={['text-xs px-2 py-0.5 rounded-full font-medium', TIPO_COLOR[opp.tipo_venta] ?? 'bg-gray-100 text-gray-600'].join(' ')}>{TIPO_VENTA_LABELS[opp.tipo_venta] ?? opp.tipo_venta}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-600 border border-red-100">{opp.etapa_actual}</span>
               </div>
               <h2 className="text-base font-bold text-gray-800 leading-tight">{opp.nombre}</h2>
               {opp.cliente && <p className="text-xs text-gray-500 mt-0.5">{opp.cliente.razon_social}</p>}
-              {opp.monto_estimado != null && <p className="text-sm font-bold mt-1" style={{color:'#ed3224'}}>{formatCLP(opp.monto_estimado)}</p>}
+              {opp.monto_estimado != null && (
+                <p className="text-sm font-bold mt-1" style={{color:'#ed3224'}}>
+                  {formatCLP(opp.monto_estimado)}
+                  <span className="block text-[11px] font-normal text-gray-400">{formatMM(opp.monto_estimado)}</span>
+                </p>
+              )}
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X size={18} /></button>
           </div>
@@ -315,7 +374,9 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Tipo venta</label>
                   <select value={opp.tipo_venta} onChange={e => setOpp(o => ({...o,tipo_venta:e.target.value as 'Proyecto'|'Producto'|'Kit'}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                    <option>Proyecto</option><option>Producto</option><option>Kit</option>
+                    <option value="Proyecto">{TIPO_VENTA_LABELS.Proyecto}</option>
+                    <option value="Producto">{TIPO_VENTA_LABELS.Producto}</option>
+                    <option value="Kit">{TIPO_VENTA_LABELS.Kit}</option>
                   </select></div>
                 <div><label className="block text-xs font-medium text-gray-600 mb-1">Cierre estimado</label>
                   <input type="date" value={opp.fecha_cierre_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_cierre_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
@@ -328,11 +389,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
               </div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Descripcion</label>
                 <textarea value={opp.descripcion ?? ''} onChange={e => setOpp(o => ({...o,descripcion:e.target.value||null}))} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" /></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Asignado a (etapa actual)</label>
-                <select value={asignadoId} onChange={e => saveAsignacion(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                  <option value="">Sin asignar</option>
-                  {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido} ({u.rol.replace(/_/g,' ')})</option>)}
-                </select></div>
+              {opp.etapa_actual !== 'Clasificación' && (
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Asignado a (etapa actual)</label>
+                  <select value={asignadoId} onChange={e => saveAsignacion(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                    <option value="">Sin asignar</option>
+                    {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido} ({u.rol.replace(/_/g,' ')})</option>)}
+                  </select></div>
+              )}
               <button onClick={saveGeneral} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
                 {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar cambios'}
               </button>
@@ -402,7 +465,15 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         {/* Footer */}
         {!isTerminal && (
           <div className="p-4 border-t border-gray-200 flex-shrink-0 flex gap-2">
-            <button onClick={avanzarEtapa} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-60" style={{background:'#ed3224'}}>
+            {canGoBack && (
+              <button onClick={retrocederEtapa} disabled={saving || !canManageStage} title={!canManageStage ? 'Tu rol no gestiona esta etapa' : undefined}
+                className="px-3 py-2 flex items-center justify-center gap-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-40">
+                <ChevronRight size={14} className="rotate-180" />
+                Retroceder
+              </button>
+            )}
+            <button onClick={avanzarEtapa} disabled={saving || !canManageStage} title={!canManageStage ? 'Tu rol no gestiona esta etapa' : undefined}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-60" style={{background:'#ed3224'}}>
               {saving ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} />}
               {saving ? 'Avanzando...' : 'Avanzar a ' + nextEtapa}
             </button>
