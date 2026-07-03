@@ -4,23 +4,25 @@ import { supabase } from '@/lib/supabase'
 import type { Oportunidad } from '@/types/database'
 import OportunidadDrawer from '@/components/OportunidadDrawer'
 
-const TC:Record<string,string>={Proyecto:'bg-purple-100 text-purple-700',Producto:'bg-blue-100 text-blue-700',Kit:'bg-amber-100 text-amber-700'}
-interface OE extends Oportunidad{asignado?:{nombre:string;apellido:string}|null;dias?:number}
+const TIPO_COLOR: Record<string,string>={Proyecto:'bg-purple-100 text-purple-700',Producto:'bg-blue-100 text-blue-700',Kit:'bg-amber-100 text-amber-700'}
+interface OE extends Oportunidad{asignado?:{nombre:string;apellido:string}|null;diasEtapa?:number}
 
-export default function Cubicacion(){
+export default function Desarrollo(){
   const [opps,setOpps]=useState<OE[]>([])
   const [loading,setLoading]=useState(true)
   const [sel,setSel]=useState<Oportunidad|null>(null)
+
   async function load(){
-    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Costos y Presupuestos').order('updated_at',{ascending:false})
+    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Desarrollo').order('updated_at',{ascending:false})
     const base=(data as Oportunidad[])||[]
     if(!base.length){setOpps([]);setLoading(false);return}
     const ids=base.map(o=>o.id)
     const [{data:asigs},{data:hist}]=await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario_id').in('oportunidad_id',ids).eq('etapa','Costos y Presupuestos'),
-      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Costos y Presupuestos').is('fecha_salida',null),
+      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario_id').in('oportunidad_id',ids).eq('etapa','Desarrollo'),
+      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Desarrollo').is('fecha_salida',null),
     ])
-    const am:Record<string,{nombre:string;apellido:string}>={};const dm:Record<string,number>={}
+    const am:Record<string,{nombre:string;apellido:string}>={}
+    const dm:Record<string,number>={}
     const userIds=[...new Set((asigs||[]).map((a:any)=>a.usuario_id).filter(Boolean))]
     if(userIds.length){
       const {data:users}=await supabase.from('profiles').select('id,nombre,apellido').in('id',userIds)
@@ -30,9 +32,11 @@ export default function Cubicacion(){
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(hist||[]).forEach((h:any)=>{dm[h.oportunidad_id]=Math.floor((Date.now()-new Date(h.fecha_entrada).getTime())/86400000)})
-    setOpps(base.map(o=>({...o,asignado:am[o.id]??null,dias:dm[o.id]??0})));setLoading(false)
+    setOpps(base.map(o=>({...o,asignado:am[o.id]??null,diasEtapa:dm[o.id]??0})))
+    setLoading(false)
   }
   useEffect(()=>{load()},[])
+
   if(loading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin"/></div>
   return(
     <div className="flex flex-col h-full">
@@ -43,19 +47,24 @@ export default function Cubicacion(){
             <div key={o.id} onClick={()=>setSel(o)} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1"><span className="text-xs text-gray-400 font-mono">{o.codigo}</span><span className={'text-xs px-1.5 py-0.5 rounded-full font-medium '+(TC[o.tipo_venta]??'bg-gray-100 text-gray-600')}>{o.tipo_venta}</span></div>
+                  <div className="flex items-center gap-2 mb-1"><span className="text-xs text-gray-400 font-mono">{o.codigo}</span><span className={'text-xs px-1.5 py-0.5 rounded-full font-medium '+(TIPO_COLOR[o.tipo_venta]??'bg-gray-100 text-gray-600')}>{o.tipo_venta}</span></div>
                   <p className="text-sm font-semibold text-gray-800">{o.nombre}</p>
                   {o.cliente&&<p className="text-xs text-gray-500 mt-0.5">{(o.cliente as {razon_social:string}).razon_social}</p>}
                 </div>
                 <div className="text-right flex-shrink-0">
                   {o.monto_estimado!=null&&<p className="text-sm font-bold text-brand-red">{'$'+o.monto_estimado.toLocaleString('es-CL')}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">{o.probabilidad??0}%</p>
-                  {o.dias!==undefined&&<div className="flex items-center justify-end gap-1 mt-1"><Clock size={10} className="text-gray-400"/><span className="text-xs text-gray-400">{o.dias}d</span></div>}
+                  {o.diasEtapa!==undefined&&<div className="flex items-center justify-end gap-1 mt-1"><Clock size={10} className="text-gray-400"/><span className="text-xs text-gray-400">{o.diasEtapa}d</span></div>}
                 </div>
               </div>
               <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-xs text-gray-400">Vendedor: {o.vendedor ? `${(o.vendedor as {nombre:string;apellido:string}).nombre} ${(o.vendedor as {nombre:string;apellido:string}).apellido}` : '—'}</p>
-                <p className="text-xs font-medium flex items-center gap-1 text-blue-500"><User size={10}/>{o.asignado ? `${o.asignado.nombre} ${o.asignado.apellido}` : 'Sin asignar'}</p>
+                <p className="text-xs text-gray-400">
+                  Vendedor: {o.vendedor ? `${(o.vendedor as {nombre:string;apellido:string}).nombre} ${(o.vendedor as {nombre:string;apellido:string}).apellido}` : '—'}
+                </p>
+                <p className="text-xs font-medium flex items-center gap-1 text-blue-500">
+                  <User size={10}/>
+                  {o.asignado ? `${o.asignado.nombre} ${o.asignado.apellido}` : 'Sin asignar'}
+                </p>
               </div>
             </div>
           ))}</div>

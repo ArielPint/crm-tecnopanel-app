@@ -8,9 +8,9 @@ import Oportunidades from '@/pages/Oportunidades'
 import Clientes from '@/pages/Clientes'
 import Usuarios from '@/pages/Usuarios'
 import Ingenieria from '@/pages/Ingenieria'
+import Desarrollo from '@/pages/Desarrollo'
 import Cubicacion from '@/pages/Cubicacion'
-import Presupuestos from '@/pages/Presupuestos'
-import Credito from '@/pages/Credito'
+import Negociacion from '@/pages/Negociacion'
 
 function ProtectedRoute({ modulo, children }: { modulo: string; children: React.ReactNode }) {
   const { profile } = useAuth()
@@ -35,9 +35,9 @@ function AppRoutes() {
         <Route path="/dashboard"     element={<Dashboard />} />
         <Route path="/oportunidades" element={<ProtectedRoute modulo="Oportunidades"><Oportunidades /></ProtectedRoute>} />
         <Route path="/ingenieria"    element={<ProtectedRoute modulo="Ingeniería"><Ingenieria /></ProtectedRoute>} />
-        <Route path="/cubicacion"    element={<ProtectedRoute modulo="Cubicación"><Cubicacion /></ProtectedRoute>} />
-        <Route path="/presupuestos"  element={<ProtectedRoute modulo="Presupuestos"><Presupuestos /></ProtectedRoute>} />
-        <Route path="/credito"       element={<ProtectedRoute modulo="Crédito"><Credito /></ProtectedRoute>} />
+        <Route path="/desarrollo"    element={<ProtectedRoute modulo="Desarrollo"><Desarrollo /></ProtectedRoute>} />
+        <Route path="/cubicacion"    element={<ProtectedRoute modulo="Costos y Presupuestos"><Cubicacion /></ProtectedRoute>} />
+        <Route path="/negociacion"   element={<ProtectedRoute modulo="Negociación"><Negociacion /></ProtectedRoute>} />
         <Route path="/clientes"      element={<ProtectedRoute modulo="Clientes"><Clientes /></ProtectedRoute>} />
         <Route path="/usuarios"      element={<ProtectedRoute modulo="Usuarios"><Usuarios /></ProtectedRoute>} />
       </Route>

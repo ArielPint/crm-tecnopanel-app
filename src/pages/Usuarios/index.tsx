@@ -16,9 +16,10 @@ const ROL_META: Record<string, { label: string; badge: string; descripcion: stri
   cubicador:       { label:'Cubicador',         badge:'bg-green-100 text-green-700', descripcion:'Cubicación de proyectos' },
   presupuestista:  { label:'Presupuestista',    badge:'bg-lime-100 text-lime-700',   descripcion:'Elaboración de presupuestos' },
   finanzas:        { label:'Finanzas',          badge:'bg-amber-100 text-amber-700', descripcion:'Evaluación crediticia y finanzas' },
+  desarrollador:   { label:'Desarrollador',      badge:'bg-fuchsia-100 text-fuchsia-700', descripcion:'Entrega de planos y fichas en etapa Desarrollo' },
 }
 
-const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Cubicación','Presupuestos','Crédito','Clientes','Usuarios']
+const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Clientes','Usuarios']
 
 type Rol = keyof typeof ROL_META
 interface Profile { id:string; nombre:string; apellido:string; email:string; rol:string; activo:boolean; created_at:string }

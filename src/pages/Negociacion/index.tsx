@@ -7,18 +7,18 @@ import OportunidadDrawer from '@/components/OportunidadDrawer'
 const TC:Record<string,string>={Proyecto:'bg-purple-100 text-purple-700',Producto:'bg-blue-100 text-blue-700',Kit:'bg-amber-100 text-amber-700'}
 interface OE extends Oportunidad{asignado?:{nombre:string;apellido:string}|null;dias?:number}
 
-export default function Cubicacion(){
+export default function Negociacion(){
   const [opps,setOpps]=useState<OE[]>([])
   const [loading,setLoading]=useState(true)
   const [sel,setSel]=useState<Oportunidad|null>(null)
   async function load(){
-    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Costos y Presupuestos').order('updated_at',{ascending:false})
+    const {data}=await supabase.from('oportunidades').select('*,cliente:clientes(razon_social),vendedor:profiles(nombre,apellido)').eq('etapa_actual','Negociación').order('updated_at',{ascending:false})
     const base=(data as Oportunidad[])||[]
     if(!base.length){setOpps([]);setLoading(false);return}
     const ids=base.map(o=>o.id)
     const [{data:asigs},{data:hist}]=await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario_id').in('oportunidad_id',ids).eq('etapa','Costos y Presupuestos'),
-      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Costos y Presupuestos').is('fecha_salida',null),
+      supabase.from('oportunidad_asignaciones').select('oportunidad_id,usuario_id').in('oportunidad_id',ids).eq('etapa','Negociación'),
+      supabase.from('oportunidad_historial_etapas').select('oportunidad_id,fecha_entrada').in('oportunidad_id',ids).eq('etapa','Negociación').is('fecha_salida',null),
     ])
     const am:Record<string,{nombre:string;apellido:string}>={};const dm:Record<string,number>={}
     const userIds=[...new Set((asigs||[]).map((a:any)=>a.usuario_id).filter(Boolean))]

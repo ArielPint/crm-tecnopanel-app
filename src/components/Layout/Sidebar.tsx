@@ -1,15 +1,17 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Target, Compass, Ruler, Wallet, Landmark, Users, Building2, LogOut, ChevronRight, X } from 'lucide-react'
+import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePermisos } from '@/contexts/PermisosContext'
 
+// Nota: se mantiene la ruta '/cubicacion' para el modulo renombrado a "Costos y Presupuestos"
+// (antes "Cubicación") para no romper enlaces/bookmarks existentes; solo cambia el label visible.
 const MODULO_RUTA: Record<string, string> = {
   Dashboard: '/dashboard',
   Oportunidades: '/oportunidades',
   'Ingeniería': '/ingenieria',
-  'Cubicación': '/cubicacion',
-  Presupuestos: '/presupuestos',
-  'Crédito': '/credito',
+  'Desarrollo': '/desarrollo',
+  'Costos y Presupuestos': '/cubicacion',
+  'Negociación': '/negociacion',
   Clientes: '/clientes',
   Usuarios: '/usuarios',
 }
@@ -18,16 +20,16 @@ const MODULO_ICON: Record<string, React.ReactNode> = {
   Dashboard:    <LayoutDashboard size={16} />,
   Oportunidades:<Target size={16} />,
   'Ingeniería': <Compass size={16} />,
-  'Cubicación': <Ruler size={16} />,
-  Presupuestos: <Wallet size={16} />,
-  'Crédito':    <Landmark size={16} />,
+  'Desarrollo': <Hammer size={16} />,
+  'Costos y Presupuestos': <Ruler size={16} />,
+  'Negociación': <Landmark size={16} />,
   Clientes:     <Building2 size={16} />,
   Usuarios:     <Users size={16} />,
 }
 
 const GRUPOS = [
   { label: 'Principal', modulos: ['Dashboard', 'Oportunidades'] },
-  { label: 'Módulos',   modulos: ['Ingeniería', 'Cubicación', 'Presupuestos', 'Crédito'] },
+  { label: 'Módulos',   modulos: ['Ingeniería', 'Desarrollo', 'Costos y Presupuestos', 'Negociación'] },
   { label: 'Sistema',   modulos: ['Clientes', 'Usuarios'] },
 ]
 
