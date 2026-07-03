@@ -1,6 +1,7 @@
 export type RolUsuario =
   | 'admin' | 'gerente_ventas' | 'gerente_general' | 'vendedor'
   | 'jefe_ingenieria' | 'ingeniero' | 'cubicador' | 'presupuestista' | 'finanzas'
+  | 'desarrollador'
 
 export type TipoVenta = 'Proyecto' | 'Producto' | 'Kit'
 
@@ -49,7 +50,19 @@ export interface Oportunidad {
   moneda: string
   vendedor_id: string | null
   fecha_cierre_est: string | null
+  fecha_cierre_real?: string | null
+  motivo_perdida: string | null
   descripcion: string | null
+  notas_internas?: string | null
+  nombre_entidad_patrocinante: string | null
+  region: string | null
+  comuna: string | null
+  cantidad_casas: number | null
+  cantidad_tipos_casas: number | null
+  fecha_adjudicacion_est: string | null
+  fecha_inicio_despachos_est: string | null
+  duracion_meses_est: number | null
+  familia_productos: string[] | null
   created_at: string
   updated_at: string
   cliente?: Cliente
