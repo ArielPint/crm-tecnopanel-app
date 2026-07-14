@@ -21,10 +21,12 @@ const ETAPA_INICIAL_POR_TIPO: Record<TipoVenta, string> = {
   Kit: 'Costos y Presupuestos',
 }
 
-const FAMILIA_PRODUCTOS_OPCIONES = ['TecnoPanel', 'TecnoTruss', 'TecnoFrame', 'Escaleras'] as const
+export const FAMILIA_PRODUCTOS_OPCIONES = ['TecnoPanel', 'TecnoTruss', 'TecnoFrame', 'Escaleras'] as const
+
+export const ALCANCES_OPCIONES = ['Memoria', 'Planos estructurales', 'Desarrollo de arquitectura', 'Modulación Simple'] as const
 
 // Subconjunto de regiones/comunas de Chile, pensado para ser facil de ampliar.
-const REGIONES_COMUNAS: Record<string, string[]> = {
+export const REGIONES_COMUNAS: Record<string, string[]> = {
   'Región Metropolitana': ['Santiago', 'Puente Alto', 'Maipú', 'La Florida', 'Las Condes', 'San Bernardo', 'Colina', 'Melipilla'],
   'Valparaíso': ['Valparaíso', 'Viña del Mar', 'Quilpué', 'San Antonio', 'Los Andes', 'Quillota'],
   'Biobío': ['Concepción', 'Talcahuano', 'Los Ángeles', 'Chillán', 'Coronel'],
@@ -54,6 +56,7 @@ interface FormData {
   fecha_adjudicacion_est: string; fecha_inicio_despachos_est: string;
   duracion_meses_est: string;
   familia_productos: string[];
+  alcances: string[];
 }
 const INIT: FormData = {
   nombre:'', cliente_id:'', tipo_venta:'Proyecto',
@@ -65,6 +68,7 @@ const INIT: FormData = {
   fecha_adjudicacion_est:'', fecha_inicio_despachos_est:'',
   duracion_meses_est:'',
   familia_productos: [],
+  alcances: [],
 }
 function genCodigo() { const d=new Date(); return 'OPP-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+'-'+(crypto.getRandomValues(new Uint16Array(1))[0]%9000+1000) }
 
@@ -77,6 +81,10 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
   const [archivo, setArchivo] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showNuevoCliente, setShowNuevoCliente] = useState(false)
+  const [nuevoCliente, setNuevoCliente] = useState({ razon_social: '', rut: '', rubro: '' })
+  const [creandoCliente, setCreandoCliente] = useState(false)
+  const [errorCliente, setErrorCliente] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -88,12 +96,38 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
   const comunasDisponibles = form.region ? (REGIONES_COMUNAS[form.region] ?? []) : []
   const etapaInicial = ETAPA_INICIAL_POR_TIPO[form.tipo_venta]
 
+  async function crearClienteInline() {
+    if (!nuevoCliente.razon_social.trim()) { setErrorCliente('La razón social es requerida'); return }
+    setCreandoCliente(true); setErrorCliente('')
+    const { data, error: err } = await supabase.from('clientes').insert({
+      razon_social: nuevoCliente.razon_social.trim(),
+      rut: nuevoCliente.rut.trim() || null,
+      rubro: nuevoCliente.rubro.trim() || null,
+      creado_por: profile?.id ?? null,
+    }).select('id,razon_social').single()
+    if (err) { setErrorCliente(err.message); setCreandoCliente(false); return }
+    const nuevo = data as Cliente
+    setClientes(cs => [...cs, nuevo].sort((a, b) => a.razon_social.localeCompare(b.razon_social)))
+    setForm(f => ({ ...f, cliente_id: nuevo.id }))
+    setNuevoCliente({ razon_social: '', rut: '', rubro: '' })
+    setShowNuevoCliente(false); setCreandoCliente(false)
+  }
+
   function toggleFamiliaProducto(valor: string) {
     setForm(f => ({
       ...f,
       familia_productos: f.familia_productos.includes(valor)
         ? f.familia_productos.filter(v => v !== valor)
         : [...f.familia_productos, valor],
+    }))
+  }
+
+  function toggleAlcance(valor: string) {
+    setForm(f => ({
+      ...f,
+      alcances: f.alcances.includes(valor)
+        ? f.alcances.filter(v => v !== valor)
+        : [...f.alcances, valor],
     }))
   }
 
@@ -119,6 +153,7 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
       fecha_inicio_despachos_est: form.fecha_inicio_despachos_est || null,
       duracion_meses_est: form.duracion_meses_est ? Number(form.duracion_meses_est) : null,
       familia_productos: form.familia_productos.length ? form.familia_productos : null,
+      alcances: form.alcances.length ? form.alcances : null,
     }).select('id').single()
     if (err) { setError(err.message); setSaving(false); return }
     const oportunidadId = (data as { id: string })?.id ?? null
@@ -161,7 +196,29 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-gray-700">Cliente</label>
+              <button type="button" onClick={() => setShowNuevoCliente(s => !s)} className="text-xs font-medium text-brand-red hover:underline">
+                {showNuevoCliente ? 'Cancelar' : '+ Crear cliente nuevo'}
+              </button>
+            </div>
+            {showNuevoCliente ? (
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2 mb-2">
+                <input value={nuevoCliente.razon_social} onChange={e => setNuevoCliente(c=>({...c,razon_social:e.target.value}))}
+                  placeholder="Razón social *" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={nuevoCliente.rut} onChange={e => setNuevoCliente(c=>({...c,rut:e.target.value}))}
+                    placeholder="RUT" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                  <input value={nuevoCliente.rubro} onChange={e => setNuevoCliente(c=>({...c,rubro:e.target.value}))}
+                    placeholder="Rubro" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                </div>
+                {errorCliente && <p className="text-xs text-red-600">{errorCliente}</p>}
+                <button type="button" onClick={crearClienteInline} disabled={creandoCliente}
+                  className="px-3 py-1 text-xs text-white rounded disabled:opacity-60" style={{background:'#ed3224'}}>
+                  {creandoCliente ? 'Creando...' : 'Crear y seleccionar'}
+                </button>
+              </div>
+            ) : null}
             <select value={form.cliente_id} onChange={e => setForm(f=>({...f,cliente_id:e.target.value}))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
               <option value="">Sin cliente</option>
@@ -262,6 +319,19 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
               {FAMILIA_PRODUCTOS_OPCIONES.map(opcion => (
                 <label key={opcion} className="flex items-center gap-1.5 text-sm text-gray-600">
                   <input type="checkbox" checked={form.familia_productos.includes(opcion)} onChange={() => toggleFamiliaProducto(opcion)}
+                    className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                  {opcion}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Alcances</label>
+            <div className="flex flex-wrap gap-3">
+              {ALCANCES_OPCIONES.map(opcion => (
+                <label key={opcion} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <input type="checkbox" checked={form.alcances.includes(opcion)} onChange={() => toggleAlcance(opcion)}
                     className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
                   {opcion}
                 </label>

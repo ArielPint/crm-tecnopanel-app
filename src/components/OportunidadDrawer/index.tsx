@@ -1,8 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
-import { X, ChevronRight, Upload, Link2, FileText, Clock, User, Loader2, Trash2, ExternalLink } from 'lucide-react'
+import { X, ChevronRight, Upload, Link2, FileText, Clock, User, Loader2, Trash2, ExternalLink, MessageCircle, Send, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Oportunidad, Profile, OportunidadHistorialEtapa, OportunidadDocumento } from '@/types/database'
+import type { Oportunidad, Profile, OportunidadHistorialEtapa, OportunidadDocumento, OportunidadAsignacion, TareaIngenieria, MensajeOportunidad, Cierre } from '@/types/database'
+import { FAMILIA_PRODUCTOS_OPCIONES, ALCANCES_OPCIONES, REGIONES_COMUNAS } from '@/components/NuevaOportunidadModal'
+
+const REGIONES = Object.keys(REGIONES_COMUNAS)
 
 const ETAPAS_ORDER = [
   'Clasificación','Ingeniería','Desarrollo','Costos y Presupuestos',
@@ -61,17 +64,27 @@ interface Props {
   onUpdate: () => void
 }
 
-type Tab = 'general' | 'etapa' | 'docs' | 'historial'
+type Tab = 'general' | 'etapa' | 'docs' | 'historial' | 'chat'
 
 export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Props) {
   const { profile } = useAuth()
   const [tab, setTab] = useState<Tab>('general')
   const [opp, setOpp] = useState<Oportunidad>(oportunidad)
   const [usuarios, setUsuarios] = useState<Profile[]>([])
-  const [asignadoId, setAsignadoId] = useState<string>('')
+  const [asignadosIds, setAsignadosIds] = useState<string[]>([])
   const [etapaData, setEtapaData] = useState<Record<string, string>>({})
   const [docs, setDocs] = useState<OportunidadDocumento[]>([])
   const [historial, setHistorial] = useState<OportunidadHistorialEtapa[]>([])
+  const [tareas, setTareas] = useState<TareaIngenieria[]>([])
+  const [showCrearTarea, setShowCrearTarea] = useState(false)
+  const [nuevaTarea, setNuevaTarea] = useState({ titulo: '', descripcion: '', asignado_a: '', prioridad: '2', fecha_limite: '' })
+  const [creandoTarea, setCreandoTarea] = useState(false)
+  const [mensajes, setMensajes] = useState<MensajeOportunidad[]>([])
+  const [nuevoMensaje, setNuevoMensaje] = useState('')
+  const [cierre, setCierre] = useState<Cierre | null>(null)
+  const [ocForm, setOcForm] = useState({ numero_oc: '', monto_oc: '', fecha_oc: '' })
+  const [ocFile, setOcFile] = useState<File | null>(null)
+  const [savingOc, setSavingOc] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -82,21 +95,99 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
 
   useEffect(() => { setOpp(oportunidad); setTab('general'); loadAll() }, [oportunidad.id])
 
+  useEffect(() => {
+    if (tab !== 'chat') return
+    loadMensajes()
+    const id = setInterval(loadMensajes, 8000)
+    return () => clearInterval(id)
+  }, [tab, opp.id])
+
   async function loadAll() {
     setLoading(true)
-    const [asigRes, etapaRes, docsRes, histRes, usersRes] = await Promise.all([
-      supabase.from('oportunidad_asignaciones').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', oportunidad.etapa_actual).maybeSingle(),
+    const [asigRes, etapaRes, docsRes, histRes, usersRes, tareasRes, cierreRes] = await Promise.all([
+      supabase.from('oportunidad_asignaciones').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', oportunidad.etapa_actual),
       supabase.from('oportunidad_datos_etapa').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', oportunidad.etapa_actual).maybeSingle(),
       supabase.from('oportunidad_documentos').select('*').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
       supabase.from('oportunidad_historial_etapas').select('*,usuario:profiles(nombre,apellido)').eq('oportunidad_id', oportunidad.id).order('fecha_entrada', { ascending: false }),
       supabase.from('profiles').select('*').eq('activo', true).order('nombre'),
+      supabase.from('tareas_ingenieria').select('*,asignado:profiles(nombre,apellido)').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
+      supabase.from('cierres').select('*').eq('oportunidad_id', oportunidad.id).maybeSingle(),
     ])
-    setAsignadoId((asigRes.data as {usuario_id?:string}|null)?.usuario_id ?? '')
+    setAsignadosIds(((asigRes.data as OportunidadAsignacion[]) ?? []).map(a => a.usuario_id))
     setEtapaData(((etapaRes.data as {datos?:Record<string,string>}|null)?.datos) ?? {})
     setDocs((docsRes.data as OportunidadDocumento[]) ?? [])
     setHistorial((histRes.data as OportunidadHistorialEtapa[]) ?? [])
     setUsuarios((usersRes.data as Profile[]) ?? [])
+    setTareas((tareasRes.data as TareaIngenieria[]) ?? [])
+    const c = cierreRes.data as Cierre | null
+    setCierre(c)
+    setOcForm({ numero_oc: c?.numero_oc ?? '', monto_oc: c?.monto_oc != null ? String(c.monto_oc) : '', fecha_oc: c?.fecha_oc ?? '' })
     setLoading(false)
+  }
+
+  async function guardarOc() {
+    setSavingOc(true)
+    let storagePath = cierre?.storage_oc_path ?? null
+    if (ocFile) {
+      const path = opp.id + '/oc-' + Date.now() + '-' + ocFile.name
+      const { error: upErr } = await supabase.storage.from('oportunidades').upload(path, ocFile)
+      if (!upErr) storagePath = path
+    }
+    const payload = {
+      numero_oc: ocForm.numero_oc.trim() || null,
+      monto_oc: ocForm.monto_oc ? Number(ocForm.monto_oc) : null,
+      fecha_oc: ocForm.fecha_oc || null,
+      storage_oc_path: storagePath,
+    }
+    if (cierre) {
+      await supabase.from('cierres').update(payload).eq('id', cierre.id)
+    } else {
+      await supabase.from('cierres').insert({
+        oportunidad_id: opp.id, resultado: 'ganado', registrado_por: profile?.id, ...payload,
+      })
+    }
+    setOcFile(null); setSavingOc(false)
+    await loadAll()
+  }
+
+  async function loadMensajes() {
+    const { data } = await supabase.from('mensajes_oportunidad').select('*,usuario:profiles(nombre,apellido)')
+      .eq('oportunidad_id', opp.id).order('created_at', { ascending: true })
+    setMensajes((data as MensajeOportunidad[]) ?? [])
+  }
+
+  async function enviarMensaje() {
+    if (!nuevoMensaje.trim() || !profile?.id) return
+    const texto = nuevoMensaje.trim()
+    setNuevoMensaje('')
+    await supabase.from('mensajes_oportunidad').insert({
+      oportunidad_id: opp.id, etapa: opp.etapa_actual, usuario_id: profile.id, mensaje: texto,
+    })
+    await loadMensajes()
+  }
+
+  async function crearTarea() {
+    if (!nuevaTarea.titulo.trim()) return
+    setCreandoTarea(true)
+    await supabase.from('tareas_ingenieria').insert({
+      oportunidad_id: opp.id, titulo: nuevaTarea.titulo.trim(),
+      descripcion: nuevaTarea.descripcion.trim() || null,
+      asignado_a: nuevaTarea.asignado_a || null,
+      prioridad: Number(nuevaTarea.prioridad),
+      fecha_limite: nuevaTarea.fecha_limite || null,
+    })
+    if (nuevaTarea.asignado_a) {
+      await supabase.from('notifications').insert({
+        user_id: nuevaTarea.asignado_a,
+        tipo: 'asignacion',
+        titulo: `Nueva tarea: ${nuevaTarea.titulo.trim()}`,
+        mensaje: `${opp.codigo} · ${opp.nombre}`,
+        oportunidad_id: opp.id,
+      })
+    }
+    setNuevaTarea({ titulo: '', descripcion: '', asignado_a: '', prioridad: '2', fecha_limite: '' })
+    setShowCrearTarea(false); setCreandoTarea(false)
+    await loadAll()
   }
 
   async function saveGeneral() {
@@ -105,6 +196,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       nombre: opp.nombre, monto_estimado: opp.monto_estimado,
       probabilidad: opp.probabilidad, fecha_cierre_est: opp.fecha_cierre_est,
       descripcion: opp.descripcion, tipo_venta: opp.tipo_venta,
+      region: opp.region, comuna: opp.comuna,
+      cantidad_casas: opp.cantidad_casas, cantidad_tipos_casas: opp.cantidad_tipos_casas,
+      fecha_adjudicacion_est: opp.fecha_adjudicacion_est, fecha_inicio_despachos_est: opp.fecha_inicio_despachos_est,
+      duracion_meses_est: opp.duracion_meses_est, nombre_entidad_patrocinante: opp.nombre_entidad_patrocinante,
+      familia_productos: opp.familia_productos, alcances: opp.alcances,
     }).eq('id', opp.id)
     setSaving(false); onUpdate()
   }
@@ -118,15 +214,17 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     setSaving(false)
   }
 
-  async function saveAsignacion(userId: string) {
-    setAsignadoId(userId)
-    if (!userId) {
-      await supabase.from('oportunidad_asignaciones').delete().eq('oportunidad_id', opp.id).eq('etapa', opp.etapa_actual)
+  async function toggleAsignado(userId: string) {
+    if (asignadosIds.includes(userId)) {
+      setAsignadosIds(ids => ids.filter(id => id !== userId))
+      await supabase.from('oportunidad_asignaciones').delete()
+        .eq('oportunidad_id', opp.id).eq('etapa', opp.etapa_actual).eq('usuario_id', userId)
     } else {
-      await supabase.from('oportunidad_asignaciones').upsert({
+      setAsignadosIds(ids => [...ids, userId])
+      await supabase.from('oportunidad_asignaciones').insert({
         oportunidad_id: opp.id, etapa: opp.etapa_actual,
         usuario_id: userId, asignado_por: profile?.id,
-      }, { onConflict: 'oportunidad_id,etapa' })
+      })
       await supabase.from('notifications').insert({
         user_id: userId,
         tipo: 'asignacion',
@@ -226,6 +324,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     setLinkUrl(''); setLinkNombre(''); setShowLink(false); await loadAll()
   }
 
+  async function saveComentarioDoc(id: string, comentario: string) {
+    await supabase.from('oportunidad_documentos').update({ comentario: comentario.trim() || null }).eq('id', id)
+    setDocs(ds => ds.map(d => d.id === id ? { ...d, comentario: comentario.trim() || null } : d))
+  }
+
   async function deleteDoc(id: string, tipo: string, url: string) {
     if (tipo === 'archivo') await supabase.storage.from('oportunidades').remove([url])
     await supabase.from('oportunidad_documentos').delete().eq('id', id)
@@ -246,6 +349,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const currentIdx = etapas.indexOf(opp.etapa_actual)
   const isTerminal = ['Ganado','Perdido'].includes(opp.etapa_actual)
   const nextEtapa = currentIdx >= 0 && currentIdx < etapas.length - 1 ? etapas[currentIdx + 1] : 'Ganado'
+  const comunasDisponibles = opp.region ? (REGIONES_COMUNAS[opp.region] ?? []) : []
   const allowedRoles = STAGE_ROLES[opp.etapa_actual] ?? []
   const filteredUsers = usuarios.filter(u => allowedRoles.includes(u.rol))
   // Mismo control de rol para Avanzar y Retroceder: ambas son acciones de gestión de la etapa actual.
@@ -268,7 +372,6 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" />
       </div>
     )
-    if (e === 'Clasificación') return <div className="space-y-3">{ta('notas','Notas de clasificacion','Descripcion general, alcance...')}{field('origen_lead','Origen del lead','text','Referido, web, visita...')}{field('contacto_previo','Contacto previo','text','Si / No / Descripcion')}</div>
     if (e === 'Ingeniería') return (
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">{field('superficie_total','Superficie total (m²)','number','0')}{field('altura_libre','Altura libre (m)','number','0')}</div>
@@ -309,6 +412,30 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         {field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cierre</p>
         {ta('motivo_perdida','Motivo de pérdida (si aplica)','Solo relevante si la oportunidad se marca como Perdido')}
+
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Orden de Compra</p>
+        <div className="space-y-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">PDF de la OC</label>
+            <input type="file" accept=".pdf" onChange={ev => setOcFile(ev.target.files?.[0] ?? null)}
+              className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-xs file:font-medium file:bg-gray-50 hover:file:bg-gray-100" />
+            {cierre?.storage_oc_path && !ocFile && <p className="text-xs text-gray-400 mt-1">Ya hay un PDF cargado.</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-xs font-medium text-gray-600 mb-1">Número OC</label>
+              <input value={ocForm.numero_oc} onChange={ev => setOcForm(f => ({...f, numero_oc: ev.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+            <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha OC</label>
+              <input type="date" value={ocForm.fecha_oc} onChange={ev => setOcForm(f => ({...f, fecha_oc: ev.target.value}))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+          </div>
+          <div><label className="block text-xs font-medium text-gray-600 mb-1">Monto OC (CLP)</label>
+            <input type="number" value={ocForm.monto_oc} onChange={ev => setOcForm(f => ({...f, monto_oc: ev.target.value}))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+          <button onClick={guardarOc} disabled={savingOc} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
+            {savingOc && <Loader2 size={14} className="animate-spin" />}{savingOc ? 'Guardando...' : 'Guardar OC'}
+          </button>
+        </div>
       </div>
     )
     return <p className="text-sm text-gray-400 text-center py-6">Sin campos para esta etapa</p>
@@ -355,7 +482,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 flex-shrink-0">
-          {([['general','General'],['etapa', isTerminal ? 'Datos' : opp.etapa_actual],['docs','Docs ('+docs.length+')'],['historial','Historial']] as [Tab,string][]).map(([k,label]) => (
+          {([['general','General'],['etapa', isTerminal ? 'Datos' : (opp.etapa_actual === 'Clasificación' ? 'Información adicional' : opp.etapa_actual)],['docs','Docs ('+docs.length+')'],['chat','Chat'],['historial','Historial']] as [Tab,string][]).map(([k,label]) => (
             <button key={k} onClick={() => setTab(k)}
               className={['flex-1 text-xs font-medium py-2.5 border-b-2 transition-colors truncate px-1', tab===k ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'].join(' ')}>
               {label}
@@ -389,12 +516,78 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
               </div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Descripcion</label>
                 <textarea value={opp.descripcion ?? ''} onChange={e => setOpp(o => ({...o,descripcion:e.target.value||null}))} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" /></div>
-              {opp.etapa_actual !== 'Clasificación' && (
-                <div><label className="block text-xs font-medium text-gray-600 mb-1">Asignado a (etapa actual)</label>
-                  <select value={asignadoId} onChange={e => saveAsignacion(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                    <option value="">Sin asignar</option>
-                    {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido} ({u.rol.replace(/_/g,' ')})</option>)}
+
+              {opp.tipo_venta === 'Kit' && (
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Entidad patrocinante</label>
+                  <input value={opp.nombre_entidad_patrocinante ?? ''} onChange={e => setOpp(o => ({...o,nombre_entidad_patrocinante:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Región</label>
+                  <select value={opp.region ?? ''} onChange={e => setOpp(o => ({...o,region:e.target.value||null,comuna:null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                    <option value="">Sin región</option>
+                    {REGIONES.map(r => <option key={r} value={r}>{r}</option>)}
                   </select></div>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Comuna</label>
+                  <select value={opp.comuna ?? ''} onChange={e => setOpp(o => ({...o,comuna:e.target.value||null}))} disabled={!opp.region} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red disabled:bg-gray-50 disabled:text-gray-400">
+                    <option value="">{opp.region ? 'Sin comuna' : 'Elige una región primero'}</option>
+                    {comunasDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Cantidad de casas</label>
+                  <input type="number" min="0" value={opp.cantidad_casas ?? ''} onChange={e => setOpp(o => ({...o,cantidad_casas:e.target.value?Number(e.target.value):null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Cantidad de tipos de casas</label>
+                  <input type="number" min="0" value={opp.cantidad_tipos_casas ?? ''} onChange={e => setOpp(o => ({...o,cantidad_tipos_casas:e.target.value?Number(e.target.value):null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha estimada adjudicación</label>
+                  <input type="date" value={opp.fecha_adjudicacion_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_adjudicacion_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha estimada inicio despachos</label>
+                  <input type="date" value={opp.fecha_inicio_despachos_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_inicio_despachos_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+              </div>
+
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">Duración estimada (meses)</label>
+                <input type="number" min="0" value={opp.duracion_meses_est ?? ''} onChange={e => setOpp(o => ({...o,duracion_meses_est:e.target.value?Number(e.target.value):null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
+
+              <div><label className="block text-xs font-medium text-gray-600 mb-1.5">Familia de productos</label>
+                <div className="flex flex-wrap gap-3">
+                  {FAMILIA_PRODUCTOS_OPCIONES.map(opcion => (
+                    <label key={opcion} className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <input type="checkbox" checked={(opp.familia_productos ?? []).includes(opcion)}
+                        onChange={() => setOpp(o => { const cur = o.familia_productos ?? []; const next = cur.includes(opcion) ? cur.filter(v=>v!==opcion) : [...cur,opcion]; return {...o, familia_productos: next.length?next:null} })}
+                        className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                      {opcion}
+                    </label>
+                  ))}
+                </div></div>
+
+              <div><label className="block text-xs font-medium text-gray-600 mb-1.5">Alcances</label>
+                <div className="flex flex-wrap gap-3">
+                  {ALCANCES_OPCIONES.map(opcion => (
+                    <label key={opcion} className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <input type="checkbox" checked={(opp.alcances ?? []).includes(opcion)}
+                        onChange={() => setOpp(o => { const cur = o.alcances ?? []; const next = cur.includes(opcion) ? cur.filter(v=>v!==opcion) : [...cur,opcion]; return {...o, alcances: next.length?next:null} })}
+                        className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                      {opcion}
+                    </label>
+                  ))}
+                </div></div>
+
+              {opp.etapa_actual !== 'Clasificación' && (
+                <div><label className="block text-xs font-medium text-gray-600 mb-1.5">Asignados (etapa actual)</label>
+                  <div className="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                    {filteredUsers.length === 0 ? <p className="text-xs text-gray-400 px-1">Sin usuarios disponibles para este rol</p> :
+                    filteredUsers.map(u => (
+                      <label key={u.id} className="flex items-center gap-2 text-sm text-gray-600 px-1 py-0.5">
+                        <input type="checkbox" checked={asignadosIds.includes(u.id)} onChange={() => toggleAsignado(u.id)}
+                          className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                        {u.nombre} {u.apellido} <span className="text-xs text-gray-400">({u.rol.replace(/_/g,' ')})</span>
+                      </label>
+                    ))}
+                  </div></div>
               )}
               <button onClick={saveGeneral} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
                 {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar cambios'}
@@ -406,6 +599,46 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
               <button onClick={saveEtapaData} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
                 {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar datos de etapa'}
               </button>
+
+              {opp.etapa_actual === 'Ingeniería' && (
+                <div className="pt-4 border-t border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tareas de ingeniería</p>
+                    <button onClick={() => setShowCrearTarea(s => !s)} className="flex items-center gap-1 text-xs font-medium text-brand-red hover:underline">
+                      <Plus size={12} /> Crear tarea
+                    </button>
+                  </div>
+                  {showCrearTarea && (
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                      <input value={nuevaTarea.titulo} onChange={e => setNuevaTarea(t=>({...t,titulo:e.target.value}))} placeholder="Título *" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                      <textarea value={nuevaTarea.descripcion} onChange={e => setNuevaTarea(t=>({...t,descripcion:e.target.value}))} placeholder="Descripción" rows={2} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs resize-none" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select value={nuevaTarea.asignado_a} onChange={e => setNuevaTarea(t=>({...t,asignado_a:e.target.value}))} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs">
+                          <option value="">Sin asignar</option>
+                          {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>)}
+                        </select>
+                        <input type="date" value={nuevaTarea.fecha_limite} onChange={e => setNuevaTarea(t=>({...t,fecha_limite:e.target.value}))} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                      </div>
+                      <button onClick={crearTarea} disabled={creandoTarea} className="px-3 py-1 text-xs text-white rounded disabled:opacity-60" style={{background:'#ed3224'}}>
+                        {creandoTarea ? 'Creando...' : 'Crear'}
+                      </button>
+                    </div>
+                  )}
+                  {tareas.length === 0 ? <p className="text-xs text-gray-400 text-center py-2">Sin tareas</p> : (
+                    <div className="space-y-1.5">
+                      {tareas.map(t => (
+                        <div key={t.id} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-lg">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-700 truncate">{t.titulo}</p>
+                            <p className="text-xs text-gray-400">{t.asignado ? `${(t.asignado as Profile).nombre} ${(t.asignado as Profile).apellido}` : 'Sin asignar'}{t.fecha_limite ? ' · vence ' + new Date(t.fecha_limite).toLocaleDateString('es-CL') : ''}</p>
+                          </div>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">{t.estado.replace(/_/g,' ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : tab === 'docs' ? (
             <div className="space-y-3">
@@ -436,11 +669,33 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-700 truncate">{d.nombre}</p>
                     <p className="text-xs text-gray-400">{d.etapa ?? 'General'}{d.tamanio_bytes ? ' · ' + (d.tamanio_bytes/1024).toFixed(0) + ' KB' : ''}</p>
+                    <input defaultValue={d.comentario ?? ''} placeholder="Comentario..." onBlur={e => e.target.value !== (d.comentario ?? '') && saveComentarioDoc(d.id, e.target.value)}
+                      className="mt-1 w-full px-1.5 py-1 border border-gray-100 rounded text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-red" />
                   </div>
                   <button onClick={() => openFile(d.tipo, d.url)} className="text-gray-400 hover:text-blue-500 p-1"><ExternalLink size={13} /></button>
                   <button onClick={() => deleteDoc(d.id, d.tipo, d.url)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={13} /></button>
                 </div>
               ))}
+            </div>
+          ) : tab === 'chat' ? (
+            <div className="flex flex-col h-full">
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+                {mensajes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400"><MessageCircle size={32} className="mx-auto mb-2 opacity-30" /><p className="text-sm">Sin mensajes</p></div>
+                ) : mensajes.map(m => (
+                  <div key={m.id} className={['max-w-[80%] rounded-lg px-3 py-1.5', m.usuario_id === profile?.id ? 'ml-auto bg-red-50' : 'bg-gray-100'].join(' ')}>
+                    <p className="text-xs font-medium text-gray-600">{m.usuario ? `${(m.usuario as Profile).nombre} ${(m.usuario as Profile).apellido}` : 'Usuario'}</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{m.mensaje}</p>
+                    <p className="text-[10px] text-gray-400">{new Date(m.created_at).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-3 mt-2 border-t border-gray-200">
+                <input value={nuevoMensaje} onChange={e => setNuevoMensaje(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') enviarMensaje() }}
+                  placeholder="Escribe un mensaje..." className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+                <button onClick={enviarMensaje} className="px-3 py-2 text-white rounded-lg" style={{background:'#ed3224'}}><Send size={14} /></button>
+              </div>
             </div>
           ) : (
             <div className="space-y-1">

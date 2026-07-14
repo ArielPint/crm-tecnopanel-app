@@ -63,6 +63,7 @@ export interface Oportunidad {
   fecha_inicio_despachos_est: string | null
   duracion_meses_est: number | null
   familia_productos: string[] | null
+  alcances: string[] | null
   created_at: string
   updated_at: string
   cliente?: Cliente
@@ -100,8 +101,32 @@ export interface OportunidadDocumento {
   tamanio_bytes: number | null
   subido_por: string | null
   etapa: string | null
+  comentario: string | null
   created_at: string
   subido_por_profile?: Profile
+}
+
+export interface Cierre {
+  id: string
+  oportunidad_id: string
+  resultado: 'ganado' | 'perdido'
+  motivo: string | null
+  monto_oc: number | null
+  numero_oc: string | null
+  fecha_oc: string | null
+  storage_oc_path: string | null
+  registrado_por: string | null
+  created_at: string
+}
+
+export interface MensajeOportunidad {
+  id: string
+  oportunidad_id: string
+  etapa: string | null
+  usuario_id: string | null
+  mensaje: string
+  created_at: string
+  usuario?: Profile
 }
 
 export interface ClienteHistorial {
@@ -148,6 +173,8 @@ export type Database = {
       oportunidad_asignaciones: { Row: OportunidadAsignacion }
       oportunidad_documentos: { Row: OportunidadDocumento }
       oportunidad_datos_etapa: { Row: OportunidadDatosEtapa }
+      mensajes_oportunidad: { Row: MensajeOportunidad }
+      cierres: { Row: Cierre }
     }
     Enums: {
       rol_usuario: RolUsuario

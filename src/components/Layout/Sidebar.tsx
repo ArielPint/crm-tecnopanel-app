@@ -46,7 +46,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const inner = (
     <aside className="w-64 flex-shrink-0 bg-[#1a1a1b] flex flex-col h-full">
       <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
-        <img src="/logo%20horizontal.jpeg" alt="TECNOPANEL" className="object-contain h-8 flex-1" />
+        <img src="/logo-horizontal.png" alt="TECNOPANEL" className="w-full h-auto object-contain" />
         {onClose && (
           <button onClick={onClose} className="ml-3 p-1.5 rounded text-white/40 hover:text-white hover:bg-white/10 md:hidden">
             <X size={18} />
