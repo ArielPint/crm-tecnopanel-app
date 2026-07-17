@@ -1,11 +1,56 @@
 import { useEffect, useState, useRef } from 'react'
-import { X, ChevronRight, Upload, Link2, FileText, Clock, User, Loader2, Trash2, ExternalLink, MessageCircle, Send, Plus } from 'lucide-react'
+import { X, ChevronRight, Upload, Link2, FileText, Clock, User, Loader2, Trash2, ExternalLink, MessageCircle, Send, Plus, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Oportunidad, Profile, OportunidadHistorialEtapa, OportunidadDocumento, OportunidadAsignacion, TareaIngenieria, MensajeOportunidad, Cierre } from '@/types/database'
 import { FAMILIA_PRODUCTOS_OPCIONES, ALCANCES_OPCIONES, REGIONES_COMUNAS } from '@/components/NuevaOportunidadModal'
 
 const REGIONES = Object.keys(REGIONES_COMUNAS)
+
+interface CubicacionItem { categoria: string; nombre: string; costo_unitario: number; cantidad: number; costo_total: number }
+
+const CONDICIONES_TECNICAS_DEFAULT = 'Estructura Paneles: Pino Radiata estructural, calibrado, impregnado con sales CCA, doble secado y rotulado, según norma Nch 819.\nRevestimiento: Paneles exteriores OSB 11.1\nUniones: Clavo helicoidal de disparo 31/2” alta resistencia. Clavo 2” anillado, galvanizado de disparo, para unión bastidor-tablero SP.\nDiseño: Software MITEK 2000, basado en la norma Nch 1198 y TPI 1-1995.\nMedianeros no consideran revestimiento.'
+
+const TERMINOS_CONDICIONES_DEFAULT = 'TÉRMINOS Y CONDICIONES FINANCIERAS\n\n- La cotización es válida por un período de 15 días, contados desde la fecha de entrega de la misma.\n- Periodo de suministro: máximo 120 días una vez recibida la orden de compra.\n- No se incluyen elementos complementarios no especificados expresamente en este presupuesto.\n- Cotización con definición de anteproyecto, sujeta a modificaciones técnicas y económicas según solicitud del cliente.\n- Forma de pago: a convenir.'
+
+function parseCostoExcel(ws: XLSX.WorkSheet): { cliente: string | null; proyecto: string | null; items: CubicacionItem[] } {
+  const items: CubicacionItem[] = []
+  let currentTitle = ''
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
+  const cell = (r: number, c: number) => ws[XLSX.utils.encode_cell({ r, c })]?.v
+  const cliente = typeof cell(1, 1) === 'string' ? String(cell(1, 1)) : null
+  const proyecto = typeof cell(1, 2) === 'string' ? String(cell(1, 2)) : null
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const b = cell(r, 1)
+    const c = cell(r, 2)
+    const d = cell(r, 3)
+    const e = cell(r, 4)
+    if (typeof b !== 'string' || !b.trim()) continue
+    const bLower = b.trim().toLowerCase()
+    if (bLower.startsWith('descrip')) {
+      const prevB = cell(r - 1, 1)
+      currentTitle = typeof prevB === 'string' && prevB.trim() ? prevB.trim() : `Bloque ${items.length + 1}`
+      continue
+    }
+    if (bLower.startsWith('total')) continue
+    if (typeof c === 'number' && typeof e === 'number') {
+      items.push({ categoria: currentTitle || 'General', nombre: b.trim(), costo_unitario: c, cantidad: typeof d === 'number' ? d : 1, costo_total: e })
+    }
+  }
+  return { cliente, proyecto, items }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 const ETAPAS_ORDER = [
   'Clasificación','Ingeniería','Desarrollo','Costos y Presupuestos',
@@ -81,6 +126,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const [creandoTarea, setCreandoTarea] = useState(false)
   const [mensajes, setMensajes] = useState<MensajeOportunidad[]>([])
   const [nuevoMensaje, setNuevoMensaje] = useState('')
+  const [parsingExcel, setParsingExcel] = useState(false)
+  const [excelError, setExcelError] = useState('')
+  const [generandoPdf, setGenerandoPdf] = useState(false)
+  const [showItemManual, setShowItemManual] = useState(false)
+  const [itemManual, setItemManual] = useState({ categoria: 'Manual', nombre: '', costo_unitario: '', cantidad: '1' })
   const [cierre, setCierre] = useState<Cierre | null>(null)
   const [ocForm, setOcForm] = useState({ numero_oc: '', monto_oc: '', fecha_oc: '' })
   const [ocFile, setOcFile] = useState<File | null>(null)
@@ -123,6 +173,138 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     setCierre(c)
     setOcForm({ numero_oc: c?.numero_oc ?? '', monto_oc: c?.monto_oc != null ? String(c.monto_oc) : '', fecha_oc: c?.fecha_oc ?? '' })
     setLoading(false)
+  }
+
+  async function handleCubicacionExcel(file: File) {
+    setParsingExcel(true); setExcelError('')
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+      const sheetName = wb.SheetNames.includes('COSTO') ? 'COSTO' : wb.SheetNames[0]
+      const parsed = parseCostoExcel(wb.Sheets[sheetName])
+      if (parsed.items.length === 0) {
+        setExcelError('No se reconocieron ítems en la hoja "COSTO" de este Excel. Revisa el formato o ingresa los costos manualmente.')
+      } else {
+        setEtapaData(d => ({
+          ...d,
+          cubicacion_items_json: JSON.stringify(parsed.items),
+          cubicacion_cliente: parsed.cliente ?? d.cubicacion_cliente ?? '',
+          cubicacion_proyecto: parsed.proyecto ?? d.cubicacion_proyecto ?? '',
+        }))
+      }
+    } catch {
+      setExcelError('No se pudo leer el archivo. Verifica que sea el Excel de cubicación (.xlsx) con hoja "COSTO".')
+    }
+    setParsingExcel(false)
+  }
+
+  function agregarItemManual() {
+    if (!itemManual.nombre.trim() || !itemManual.costo_unitario) return
+    let items: CubicacionItem[] = []
+    try { items = JSON.parse(etapaData['cubicacion_items_json'] || '[]') } catch { items = [] }
+    const costo_unitario = Number(itemManual.costo_unitario)
+    const cantidad = Number(itemManual.cantidad) || 1
+    items.push({ categoria: itemManual.categoria.trim() || 'Manual', nombre: itemManual.nombre.trim(), costo_unitario, cantidad, costo_total: costo_unitario * cantidad })
+    setEtapaData(d => ({ ...d, cubicacion_items_json: JSON.stringify(items) }))
+    setItemManual({ categoria: 'Manual', nombre: '', costo_unitario: '', cantidad: '1' })
+    setShowItemManual(false)
+  }
+
+  async function generarPresupuestoPdf() {
+    let items: CubicacionItem[] = []
+    try { items = JSON.parse(etapaData['cubicacion_items_json'] || '[]') } catch { items = [] }
+    if (items.length === 0) { setExcelError('Sube primero el Excel de cubicación.'); return }
+    setGenerandoPdf(true)
+    const costoCerchas = Number(etapaData['costo_cerchas'] || 0)
+    const costoFlete = Number(etapaData['costo_flete'] || 0)
+    const costoItemsTotal = items.reduce((s, i) => s + i.costo_total, 0)
+    const costoTotalInterno = costoItemsTotal + costoCerchas + costoFlete
+    const montoNetoCliente = Number(etapaData['monto_neto_cliente'] || 0)
+    const factor = costoTotalInterno > 0 && montoNetoCliente > 0 ? montoNetoCliente / costoTotalInterno : 1
+    const proyecto = etapaData['cubicacion_proyecto'] || opp.nombre
+    const clienteNombre = (opp.cliente as { razon_social?: string } | undefined)?.razon_social || etapaData['cubicacion_cliente'] || ''
+
+    const doc = new jsPDF()
+    try {
+      const logoBlob = await fetch('/logo-horizontal.png').then(r => r.blob())
+      const logoDataUrl = await blobToDataUrl(logoBlob)
+      doc.addImage(logoDataUrl, 'PNG', 15, 10, 55, 18)
+    } catch { /* logo opcional, PDF sigue sin el */ }
+    doc.setDrawColor(237, 50, 36); doc.setLineWidth(1); doc.line(15, 32, 195, 32)
+
+    doc.setFontSize(10)
+    doc.text(`Santiago, ${new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}`, 130, 42)
+    doc.setFont('helvetica', 'bold')
+    doc.text(clienteNombre.toUpperCase(), 15, 55)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`REF: PRESUPUESTO ${String(proyecto).toUpperCase()}`, 15, 65)
+    doc.text(doc.splitTextToSize(etapaData['condiciones_tecnicas'] || CONDICIONES_TECNICAS_DEFAULT, 180), 15, 78)
+
+    doc.addPage()
+    let y = 20
+    doc.setFillColor(26, 26, 27); doc.rect(15, y, 180, 8, 'F')
+    doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont('helvetica', 'bold')
+    doc.text(clienteNombre, 17, y + 5.5)
+    doc.text(String(proyecto), 105, y + 5.5)
+    doc.setTextColor(0, 0, 0)
+    y += 14
+
+    const grouped = new Map<string, CubicacionItem[]>()
+    for (const it of items) {
+      if (!grouped.has(it.categoria)) grouped.set(it.categoria, [])
+      grouped.get(it.categoria)!.push(it)
+    }
+    let totalGeneral = 0
+    for (const [categoria, group] of grouped) {
+      if (y > 260) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9)
+      doc.text(categoria, 15, y); y += 6
+      doc.text('Descripción', 15, y); doc.text('Costo unitario', 100, y); doc.text('Cantidad', 145, y); doc.text('Costo total', 165, y); y += 5
+      doc.setFont('helvetica', 'normal')
+      let subtotal = 0
+      for (const it of group) {
+        if (y > 275) { doc.addPage(); y = 20 }
+        const total = it.costo_total * factor
+        subtotal += total
+        doc.text(it.nombre, 15, y)
+        doc.text(formatCLP(Math.round(it.costo_unitario * factor)), 100, y)
+        doc.text(String(it.cantidad), 145, y)
+        doc.text(formatCLP(Math.round(total)), 165, y)
+        y += 5
+      }
+      totalGeneral += subtotal
+      doc.setFont('helvetica', 'bold')
+      doc.text('Total neto', 100, y); doc.text(formatCLP(Math.round(subtotal)), 165, y)
+      doc.setFont('helvetica', 'normal')
+      y += 9
+    }
+    if (costoCerchas > 0) {
+      doc.text('Cerchas', 15, y); doc.text(formatCLP(Math.round(costoCerchas * factor)), 165, y); y += 6
+      totalGeneral += costoCerchas * factor
+    }
+    doc.text('FLETE', 15, y); doc.text(formatCLP(Math.round(costoFlete * factor)), 165, y); y += 6
+    totalGeneral += costoFlete * factor
+    doc.setFont('helvetica', 'bold')
+    doc.setFillColor(237, 50, 36); doc.rect(15, y - 4, 180, 8, 'F'); doc.setTextColor(255, 255, 255)
+    doc.text(`TOTAL ${String(proyecto).toUpperCase()} NETO`, 17, y + 1.5)
+    doc.text(formatCLP(Math.round(montoNetoCliente || totalGeneral)), 165, y + 1.5)
+    doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal')
+
+    doc.addPage()
+    doc.setFontSize(9)
+    doc.text(doc.splitTextToSize(TERMINOS_CONDICIONES_DEFAULT, 180), 15, 20)
+
+    const blob = doc.output('blob')
+    const path = opp.id + '/presupuesto-' + Date.now() + '.pdf'
+    const { error: upErr } = await supabase.storage.from('oportunidades').upload(path, blob)
+    if (!upErr) {
+      await supabase.from('oportunidad_documentos').insert({
+        oportunidad_id: opp.id, nombre: `Presupuesto ${opp.codigo}.pdf`, tipo: 'archivo',
+        url: path, extension: 'pdf', tamanio_bytes: blob.size, subido_por: profile?.id, etapa: 'Costos y Presupuestos',
+      })
+    }
+    setGenerandoPdf(false)
+    await loadAll()
   }
 
   async function guardarOc() {
@@ -395,14 +577,92 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         {ta('notas_desarrollo','Notas','Observaciones sobre la entrega. El archivo se sube en la pestaña Docs.')}
       </div>
     )
-    if (e === 'Costos y Presupuestos') return (
+    if (e === 'Costos y Presupuestos') {
+      let cubicacionItems: CubicacionItem[] = []
+      try { cubicacionItems = JSON.parse(etapaData['cubicacion_items_json'] || '[]') } catch { cubicacionItems = [] }
+      const gruposItems = new Map<string, CubicacionItem[]>()
+      for (const it of cubicacionItems) {
+        if (!gruposItems.has(it.categoria)) gruposItems.set(it.categoria, [])
+        gruposItems.get(it.categoria)!.push(it)
+      }
+      const costoCerchas = Number(etapaData['costo_cerchas'] || 0)
+      const costoFlete = Number(etapaData['costo_flete'] || 0)
+      const costoTotalInterno = cubicacionItems.reduce((s, i) => s + i.costo_total, 0) + costoCerchas + costoFlete
+      return (
       <div className="space-y-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cubicación</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cubicación desde Excel</p>
+        <div>
+          <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-1 cursor-pointer">
+            <FileSpreadsheet size={14} /> Subir Excel de cubicación (hoja "COSTO")
+          </label>
+          <input type="file" accept=".xlsx,.xls" disabled={parsingExcel}
+            onChange={ev => { const f = ev.target.files?.[0]; if (f) handleCubicacionExcel(f); ev.target.value = '' }}
+            className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-200 file:text-xs file:font-medium file:bg-gray-50 hover:file:bg-gray-100" />
+          {parsingExcel && <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Leyendo Excel...</p>}
+          {excelError && <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 mt-1">{excelError}</p>}
+        </div>
+        {cubicacionItems.length > 0 && (
+          <div className="space-y-2 text-xs">
+            {[...gruposItems.entries()].map(([categoria, group]) => (
+              <div key={categoria} className="border border-gray-200 rounded-lg p-2">
+                <p className="font-semibold text-gray-600 mb-1">{categoria}</p>
+                {group.map((it, idx) => (
+                  <div key={idx} className="flex justify-between text-gray-500">
+                    <span className="truncate">{it.nombre}</span>
+                    <span className="flex-shrink-0 ml-2">{formatCLP(it.costo_total)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-medium text-gray-700 border-t border-gray-100 mt-1 pt-1">
+                  <span>Total neto</span><span>{formatCLP(group.reduce((s, i) => s + i.costo_total, 0))}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div>
+          <button type="button" onClick={() => setShowItemManual(s => !s)} className="flex items-center gap-1 text-xs font-medium text-brand-red hover:underline">
+            <Plus size={12} /> Agregar ítem manual (ej. algo que falte en el Excel)
+          </button>
+          {showItemManual && (
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2 mt-2">
+              <input value={itemManual.categoria} onChange={ev => setItemManual(m => ({...m, categoria: ev.target.value}))} placeholder="Categoría (ej. PANELES)" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+              <input value={itemManual.nombre} onChange={ev => setItemManual(m => ({...m, nombre: ev.target.value}))} placeholder="Descripción *" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" value={itemManual.costo_unitario} onChange={ev => setItemManual(m => ({...m, costo_unitario: ev.target.value}))} placeholder="Costo unitario *" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                <input type="number" value={itemManual.cantidad} onChange={ev => setItemManual(m => ({...m, cantidad: ev.target.value}))} placeholder="Cantidad" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+              </div>
+              <button type="button" onClick={agregarItemManual} className="px-3 py-1 text-xs text-white rounded" style={{background:'#ed3224'}}>Agregar</button>
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {field('costo_cerchas', 'Cerchas (CLP, manual)', 'number', '0')}
+          {field('costo_flete', 'Flete (CLP, manual)', 'number', '0')}
+        </div>
+        {cubicacionItems.length > 0 && (
+          <p className="text-xs font-semibold text-gray-700">Costo total interno: {formatCLP(costoTotalInterno)}</p>
+        )}
+
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Presupuesto para el cliente</p>
+        {field('monto_neto_cliente', 'Monto neto cliente (CLP)', 'number', '0')}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Condiciones técnicas (para el PDF)</label>
+          <textarea value={etapaData['condiciones_tecnicas'] ?? CONDICIONES_TECNICAS_DEFAULT}
+            onChange={ev => setEtapaData(d => ({ ...d, condiciones_tecnicas: ev.target.value }))} rows={5}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" />
+        </div>
+        <button onClick={generarPresupuestoPdf} disabled={generandoPdf || cubicacionItems.length === 0}
+          className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
+          {generandoPdf && <Loader2 size={14} className="animate-spin" />}{generandoPdf ? 'Generando...' : 'Generar Presupuesto PDF'}
+        </button>
+
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cubicación manual (si no aplica Excel)</p>
         {field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones cubicación','')}
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Presupuesto</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Presupuesto manual</p>
         {field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('margen_porcentaje','Margen (%)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}
       </div>
-    )
+      )
+    }
     if (e === 'Revisión Vendedor') return <div className="space-y-3">{field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}</div>
     if (e === 'Negociación') return (
       <div className="space-y-3">
