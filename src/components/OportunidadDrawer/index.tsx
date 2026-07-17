@@ -129,6 +129,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const [parsingExcel, setParsingExcel] = useState(false)
   const [excelError, setExcelError] = useState('')
   const [generandoPdf, setGenerandoPdf] = useState(false)
+  const [presupuestoPdfUrl, setPresupuestoPdfUrl] = useState('')
   const [showItemManual, setShowItemManual] = useState(false)
   const [itemManual, setItemManual] = useState({ categoria: 'Manual', nombre: '', costo_unitario: '', cantidad: '1' })
   const [cierre, setCierre] = useState<Cierre | null>(null)
@@ -214,7 +215,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     let items: CubicacionItem[] = []
     try { items = JSON.parse(etapaData['cubicacion_items_json'] || '[]') } catch { items = [] }
     if (items.length === 0) { setExcelError('Sube primero el Excel de cubicación.'); return }
-    setGenerandoPdf(true)
+    setGenerandoPdf(true); setPresupuestoPdfUrl('')
     const costoCerchas = Number(etapaData['costo_cerchas'] || 0)
     const costoFlete = Number(etapaData['costo_flete'] || 0)
     const costoItemsTotal = items.reduce((s, i) => s + i.costo_total, 0)
@@ -302,6 +303,8 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         oportunidad_id: opp.id, nombre: `Presupuesto ${opp.codigo}.pdf`, tipo: 'archivo',
         url: path, extension: 'pdf', tamanio_bytes: blob.size, subido_por: profile?.id, etapa: 'Costos y Presupuestos',
       })
+      const { data: signed } = await supabase.storage.from('oportunidades').createSignedUrl(path, 3600)
+      if (signed?.signedUrl) setPresupuestoPdfUrl(signed.signedUrl)
     }
     setGenerandoPdf(false)
     await loadAll()
@@ -655,6 +658,12 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
           {generandoPdf && <Loader2 size={14} className="animate-spin" />}{generandoPdf ? 'Generando...' : 'Generar Presupuesto PDF'}
         </button>
+        {presupuestoPdfUrl && (
+          <a href={presupuestoPdfUrl} target="_blank" rel="noreferrer" download={`Presupuesto ${opp.codigo}.pdf`}
+            className="w-full py-2 border border-green-200 bg-green-50 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-green-100">
+            <FileText size={14} /> PDF generado — Descargar
+          </a>
+        )}
 
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cubicación manual (si no aplica Excel)</p>
         {field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones cubicación','')}
