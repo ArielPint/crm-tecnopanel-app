@@ -11,12 +11,13 @@ import Ingenieria from '@/pages/Ingenieria'
 import Desarrollo from '@/pages/Desarrollo'
 import Cubicacion from '@/pages/Cubicacion'
 import Negociacion from '@/pages/Negociacion'
+import RevisionVendedor from '@/pages/RevisionVendedor'
 
 function ProtectedRoute({ modulo, children }: { modulo: string; children: React.ReactNode }) {
   const { profile } = useAuth()
   const { canAccess, loading } = usePermisos()
   if (loading) return null
-  if (!profile || !canAccess(modulo, profile.rol)) return <Navigate to="/dashboard" replace />
+  if (!profile || !canAccess(modulo)) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="/desarrollo"    element={<ProtectedRoute modulo="Desarrollo"><Desarrollo /></ProtectedRoute>} />
         <Route path="/cubicacion"    element={<ProtectedRoute modulo="Costos y Presupuestos"><Cubicacion /></ProtectedRoute>} />
         <Route path="/negociacion"   element={<ProtectedRoute modulo="Negociación"><Negociacion /></ProtectedRoute>} />
+        <Route path="/revision-vendedor" element={<ProtectedRoute modulo="Revisión Vendedor"><RevisionVendedor /></ProtectedRoute>} />
         <Route path="/clientes"      element={<ProtectedRoute modulo="Clientes"><Clientes /></ProtectedRoute>} />
         <Route path="/usuarios"      element={<ProtectedRoute modulo="Usuarios"><Usuarios /></ProtectedRoute>} />
       </Route>

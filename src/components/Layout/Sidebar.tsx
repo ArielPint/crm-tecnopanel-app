@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X } from 'lucide-react'
+import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X, ClipboardCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePermisos } from '@/contexts/PermisosContext'
 
@@ -12,6 +12,7 @@ const MODULO_RUTA: Record<string, string> = {
   'Desarrollo': '/desarrollo',
   'Costos y Presupuestos': '/cubicacion',
   'Negociación': '/negociacion',
+  'Revisión Vendedor': '/revision-vendedor',
   Clientes: '/clientes',
   Usuarios: '/usuarios',
 }
@@ -23,13 +24,14 @@ const MODULO_ICON: Record<string, React.ReactNode> = {
   'Desarrollo': <Hammer size={16} />,
   'Costos y Presupuestos': <Ruler size={16} />,
   'Negociación': <Landmark size={16} />,
+  'Revisión Vendedor': <ClipboardCheck size={16} />,
   Clientes:     <Building2 size={16} />,
   Usuarios:     <Users size={16} />,
 }
 
 const GRUPOS = [
   { label: 'Principal', modulos: ['Dashboard', 'Oportunidades'] },
-  { label: 'Módulos',   modulos: ['Ingeniería', 'Desarrollo', 'Costos y Presupuestos', 'Negociación'] },
+  { label: 'Módulos',   modulos: ['Ingeniería', 'Desarrollo', 'Costos y Presupuestos', 'Negociación', 'Revisión Vendedor'] },
   { label: 'Sistema',   modulos: ['Clientes', 'Usuarios'] },
 ]
 
@@ -56,7 +58,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
         {GRUPOS.map(grupo => {
-          const visibles = grupo.modulos.filter(m => canAccess(m, rol))
+          const visibles = grupo.modulos.filter(m => canAccess(m))
           if (!visibles.length) return null
           return (
             <div key={grupo.label}>

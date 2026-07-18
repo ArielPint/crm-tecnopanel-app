@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { usePermisos } from '@/contexts/PermisosContext'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 
@@ -19,51 +18,68 @@ const ROL_META: Record<string, { label: string; badge: string; descripcion: stri
   desarrollador:   { label:'Desarrollador',      badge:'bg-fuchsia-100 text-fuchsia-700', descripcion:'Entrega de planos y fichas en etapa Desarrollo' },
 }
 
-const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Clientes','Usuarios']
+const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes','Usuarios']
+
+// Permisos de página que trae un rol por defecto al crearlo (el admin luego puede ajustar por usuario)
+const DEFAULT_MODULOS: Record<string, string[]> = {
+  admin:           MODULOS,
+  gerente_general: ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes'],
+  gerente_ventas:  ['Dashboard','Oportunidades','Clientes','Revisión Vendedor'],
+  vendedor:        ['Dashboard','Oportunidades','Clientes','Revisión Vendedor'],
+  jefe_ingenieria: ['Dashboard','Ingeniería','Desarrollo'],
+  ingeniero:       ['Dashboard','Ingeniería'],
+  cubicador:       ['Dashboard','Costos y Presupuestos'],
+  presupuestista:  ['Dashboard','Costos y Presupuestos','Negociación'],
+  finanzas:        ['Dashboard','Negociación'],
+  desarrollador:   ['Dashboard','Desarrollo'],
+}
 
 type Rol = keyof typeof ROL_META
-interface Profile { id:string; nombre:string; apellido:string; email:string; rol:string; activo:boolean; created_at:string }
-interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:string }
-interface ModalEdit { id:string; nombre:string; apellido:string; rol:string }
+interface Profile { id:string; nombre:string; apellido:string; email:string; rol:string; activo:boolean; modulos:string[]; created_at:string }
+interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:string; modulos:string[] }
+interface ModalEdit { id:string; nombre:string; apellido:string; rol:string; modulos:string[] }
+
+function ModulosCheckboxGrid({ value, onChange }: { value: string[]; onChange: (modulos: string[]) => void }) {
+  function toggle(m: string) {
+    onChange(value.includes(m) ? value.filter(x => x !== m) : [...value, m])
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {MODULOS.map(m => {
+        const on = value.includes(m)
+        return (
+          <button
+            type="button"
+            key={m}
+            onClick={() => toggle(m)}
+            className={'text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors ' +
+              (on ? 'bg-brand-red/10 border-brand-red text-brand-red' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100')}
+          >
+            {m}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Usuarios() {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
-  const [showPermisos, setShowPermisos] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<ModalEdit | null>(null)
-  const [form, setForm] = useState<ModalCreate>({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor' })
+  const [form, setForm] = useState<ModalCreate>({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor', modulos: DEFAULT_MODULOS.vendedor })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { permisos, togglePermiso } = usePermisos()
-  const [toggling, setToggling] = useState<string | null>(null)
-
-  // Roles que realmente existen en el sistema (desde profiles)
-  const [rolesActivos, setRolesActivos] = useState<string[]>([])
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    const lista = (data as Profile[]) || []
-    setUsers(lista)
-    // Extraer roles únicos usados en profiles, mantener orden de ROL_META
-    const usados = new Set(lista.map(u => u.rol))
-    const ordenados = Object.keys(ROL_META).filter(r => usados.has(r))
-    // Incluir también roles que están en permisos_modulo aunque no haya usuarios
-    setRolesActivos(ordenados.length ? ordenados : Object.keys(ROL_META))
+    setUsers((data as Profile[]) || [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
-
-  // Actualizar rolesActivos cuando cambien permisos (puede haber roles en permisos sin usuarios)
-  useEffect(() => {
-    const rolesEnPermisos = [...new Set(permisos.map(p => p.rol))]
-    const rolesEnUsers = [...new Set(users.map(u => u.rol))]
-    const todos = [...new Set([...rolesEnUsers, ...rolesEnPermisos])]
-    const ordenados = Object.keys(ROL_META).filter(r => todos.includes(r))
-    if (ordenados.length) setRolesActivos(ordenados)
-  }, [permisos, users])
 
   async function handleCreate() {
     setSaving(true); setError(null)
@@ -76,7 +92,7 @@ export default function Usuarios() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al crear usuario')
-      setCreating(false); setForm({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor' }); await load()
+      setCreating(false); setForm({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor', modulos: DEFAULT_MODULOS.vendedor }); await load()
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error desconocido') }
     setSaving(false)
   }
@@ -84,7 +100,9 @@ export default function Usuarios() {
   async function handleEdit() {
     if (!editing) return
     setSaving(true); setError(null)
-    const { error: err } = await supabase.from('profiles').update({ nombre: editing.nombre, apellido: editing.apellido, rol: editing.rol }).eq('id', editing.id)
+    const { error: err } = await supabase.from('profiles')
+      .update({ nombre: editing.nombre, apellido: editing.apellido, rol: editing.rol, modulos: editing.modulos })
+      .eq('id', editing.id)
     if (err) setError(err.message)
     else { setEditing(null); await load() }
     setSaving(false)
@@ -92,13 +110,6 @@ export default function Usuarios() {
 
   async function toggleActivo(u: Profile) {
     await supabase.from('profiles').update({ activo: !u.activo }).eq('id', u.id); await load()
-  }
-
-  async function handleTogglePermiso(modulo: string, rol: string, current: boolean) {
-    const key = modulo + '|' + rol
-    setToggling(key)
-    await togglePermiso(modulo, rol, current)
-    setToggling(null)
   }
 
   // Conteo de usuarios por rol
@@ -127,6 +138,7 @@ export default function Usuarios() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Usuario</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Rol</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Páginas con acceso</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Estado</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Acciones</th>
                 </tr>
@@ -139,9 +151,16 @@ export default function Usuarios() {
                       <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
                       <td className="px-4 py-3 text-gray-500">{u.email}</td>
                       <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {(u.modulos ?? []).length
+                            ? u.modulos.map(m => <span key={m} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">{m}</span>)
+                            : <span className="text-xs text-gray-400">Sin acceso</span>}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">{u.activo ? <span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span> : <span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
                       <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
+                        <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [] }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
                         <button onClick={() => toggleActivo(u)} className={'p-1.5 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')} title={u.activo ? 'Desactivar' : 'Activar'}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
                       </div></td>
                     </tr>
@@ -170,7 +189,7 @@ export default function Usuarios() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol }); setError(null) }} className="p-2 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14}/></button>
+                    <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [] }); setError(null) }} className="p-2 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14}/></button>
                     <button onClick={() => toggleActivo(u)} className={'p-2 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
                   </div>
                 </div>
@@ -191,13 +210,13 @@ export default function Usuarios() {
           </button>
           {showRoles && (
             <div className="border-t border-gray-100 overflow-x-auto">
+              <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">El rol es solo una etiqueta descriptiva. El acceso real a cada página se define por usuario en el botón Editar.</p>
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Rol</th>
                     <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Descripción</th>
                     <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Usuarios</th>
-                    <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase">En uso</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -212,71 +231,9 @@ export default function Usuarios() {
                         <td className="px-4 py-2.5 text-center">
                           <span className="text-sm font-bold text-gray-700">{count}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-center">
-                          {count > 0
-                            ? <span className="inline-block w-2 h-2 rounded-full bg-green-500"/>
-                            : <span className="inline-block w-2 h-2 rounded-full bg-gray-200"/>}
-                        </td>
                       </tr>
                     )
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Matriz de permisos — dinámica según roles activos */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <button onClick={() => setShowPermisos(p => !p)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-700">Matriz de Permisos</span>
-              <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Editable</span>
-              <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">{rolesActivos.length} roles activos</span>
-            </div>
-            {showPermisos ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
-          </button>
-          {showPermisos && (
-            <div className="border-t border-gray-100 overflow-x-auto">
-              <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">Haz clic en una celda para activar o desactivar el acceso. Los cambios se guardan al instante.</p>
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left px-4 py-2 font-semibold text-gray-500 sticky left-0 bg-gray-50 z-10">Módulo</th>
-                    {rolesActivos.map(r => (
-                      <th key={r} className="px-3 py-2 font-semibold text-gray-500 text-center whitespace-nowrap">
-                        <div>{ROL_META[r as Rol]?.label ?? r}</div>
-                        <div className="text-[10px] font-normal text-gray-300">{countPorRol[r] ?? 0}u</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {MODULOS.map(m => (
-                    <tr key={m} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-medium text-gray-700 sticky left-0 bg-white">{m}</td>
-                      {rolesActivos.map(r => {
-                        const row = permisos.find(p => p.modulo === m && p.rol === r)
-                        const val = row?.permitido ?? false
-                        const key = m + '|' + r
-                        const isToggling = toggling === key
-                        return (
-                          <td key={r} className="px-3 py-2 text-center">
-                            <button
-                              onClick={() => handleTogglePermiso(m, r, val)}
-                              disabled={isToggling}
-                              title={val ? 'Quitar acceso a ' + (ROL_META[r as Rol]?.label ?? r) : 'Dar acceso a ' + (ROL_META[r as Rol]?.label ?? r)}
-                              className={'w-6 h-6 rounded transition-all ' + (isToggling ? 'opacity-50 cursor-wait ' : (val ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-100 hover:bg-gray-200'))}
-                            >
-                              {isToggling
-                                ? <span className="block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"/>
-                                : (val ? <span className="text-white text-[10px] font-bold">✓</span> : <span className="text-gray-300 text-[10px]">—</span>)}
-                            </button>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>
@@ -286,8 +243,8 @@ export default function Usuarios() {
 
       {/* Modal crear usuario */}
       {creating && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Nuevo usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -297,9 +254,14 @@ export default function Usuarios() {
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
-                <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+                <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value, modulos: DEFAULT_MODULOS[e.target.value] ?? [] }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
                 </select>
+                <p className="text-[11px] text-gray-400 mt-1">Aplica el acceso por defecto del rol; podés ajustarlo abajo.</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1.5">Páginas con acceso</label>
+                <ModulosCheckboxGrid value={form.modulos} onChange={modulos => setForm(f => ({ ...f, modulos }))} />
               </div>
               {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
@@ -313,8 +275,8 @@ export default function Usuarios() {
 
       {/* Modal editar usuario */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
             <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Editar usuario</h2></div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -325,6 +287,10 @@ export default function Usuarios() {
                 <select value={editing.rol} onChange={e => setEditing(ed => ed ? { ...ed, rol: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
                   {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1.5">Páginas con acceso</label>
+                <ModulosCheckboxGrid value={editing.modulos} onChange={modulos => setEditing(ed => ed ? { ...ed, modulos } : null)} />
               </div>
               {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>

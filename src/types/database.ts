@@ -17,6 +17,7 @@ export interface Profile {
   email: string
   rol: RolUsuario
   activo: boolean
+  modulos: string[]
   avatar_url: string | null
   created_at: string
   updated_at: string
