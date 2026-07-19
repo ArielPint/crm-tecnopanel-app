@@ -37,7 +37,7 @@ const DEFAULT_MODULOS: Record<string, string[]> = {
 type Rol = keyof typeof ROL_META
 interface Profile { id:string; nombre:string; apellido:string; email:string; rol:string; activo:boolean; modulos:string[]; created_at:string }
 interface ModalCreate { nombre:string; apellido:string; email:string; password:string; rol:string; modulos:string[] }
-interface ModalEdit { id:string; nombre:string; apellido:string; rol:string; modulos:string[] }
+interface ModalEdit { id:string; nombre:string; apellido:string; rol:string; modulos:string[]; nuevaPassword:string }
 
 function ModulosCheckboxGrid({ value, onChange }: { value: string[]; onChange: (modulos: string[]) => void }) {
   function toggle(m: string) {
@@ -103,8 +103,20 @@ export default function Usuarios() {
     const { error: err } = await supabase.from('profiles')
       .update({ nombre: editing.nombre, apellido: editing.apellido, rol: editing.rol, modulos: editing.modulos })
       .eq('id', editing.id)
-    if (err) setError(err.message)
-    else { setEditing(null); await load() }
+    if (err) { setError(err.message); setSaving(false); return }
+    if (editing.nuevaPassword) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(SUPABASE_URL + '/functions/v1/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
+          body: JSON.stringify({ user_id: editing.id, password: editing.nuevaPassword }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al cambiar la contraseña')
+      } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error desconocido'); setSaving(false); return }
+    }
+    setEditing(null); await load()
     setSaving(false)
   }
 
@@ -160,7 +172,7 @@ export default function Usuarios() {
                       </td>
                       <td className="px-4 py-3">{u.activo ? <span className="flex items-center gap-1 text-green-600 text-xs font-medium"><UserCheck size={13}/>Activo</span> : <span className="flex items-center gap-1 text-gray-400 text-xs font-medium"><UserX size={13}/>Inactivo</span>}</td>
                       <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [] }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
+                        <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [], nuevaPassword:'' }); setError(null) }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Editar"><Pencil size={14}/></button>
                         <button onClick={() => toggleActivo(u)} className={'p-1.5 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')} title={u.activo ? 'Desactivar' : 'Activar'}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
                       </div></td>
                     </tr>
@@ -189,7 +201,7 @@ export default function Usuarios() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [] }); setError(null) }} className="p-2 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14}/></button>
+                    <button onClick={() => { setEditing({ id:u.id, nombre:u.nombre, apellido:u.apellido, rol:u.rol, modulos: u.modulos ?? [], nuevaPassword:'' }); setError(null) }} className="p-2 rounded hover:bg-gray-100 text-gray-500"><Pencil size={14}/></button>
                     <button onClick={() => toggleActivo(u)} className={'p-2 rounded ' + (u.activo ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-600')}>{u.activo ? <UserX size={14}/> : <UserCheck size={14}/>}</button>
                   </div>
                 </div>
@@ -291,6 +303,10 @@ export default function Usuarios() {
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1.5">Páginas con acceso</label>
                 <ModulosCheckboxGrid value={editing.modulos} onChange={modulos => setEditing(ed => ed ? { ...ed, modulos } : null)} />
+              </div>
+              <div className="border-t border-gray-100 pt-3">
+                <label className="text-xs font-medium text-gray-600 block mb-1">Restablecer contraseña</label>
+                <input type="password" value={editing.nuevaPassword} onChange={e => setEditing(ed => ed ? { ...ed, nuevaPassword: e.target.value } : null)} placeholder="Dejar vacío para no cambiarla" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/>
               </div>
               {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>

@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X, ClipboardCheck } from 'lucide-react'
+import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X, ClipboardCheck, KeyRound } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePermisos } from '@/contexts/PermisosContext'
+import { supabase } from '@/lib/supabase'
 
 // Nota: se mantiene la ruta '/cubicacion' para el modulo renombrado a "Costos y Presupuestos"
 // (antes "Cubicación") para no romper enlaces/bookmarks existentes; solo cambia el label visible.
@@ -44,6 +46,20 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const { canAccess, loading } = usePermisos()
   const rol = profile?.rol ?? ''
+  const [changingPass, setChangingPass] = useState(false)
+  const [newPass, setNewPass] = useState('')
+  const [passSaving, setPassSaving] = useState(false)
+  const [passError, setPassError] = useState<string | null>(null)
+  const [passOk, setPassOk] = useState(false)
+
+  async function handleChangePassword() {
+    if (newPass.length < 6) { setPassError('Mínimo 6 caracteres'); return }
+    setPassSaving(true); setPassError(null)
+    const { error } = await supabase.auth.updateUser({ password: newPass })
+    if (error) setPassError(error.message)
+    else { setPassOk(true); setNewPass(''); setTimeout(() => { setChangingPass(false); setPassOk(false) }, 1200) }
+    setPassSaving(false)
+  }
 
   const inner = (
     <aside className="w-64 flex-shrink-0 bg-[#1a1a1b] flex flex-col h-full">
@@ -103,12 +119,38 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           </div>
         </div>
         <button
+          onClick={() => { setChangingPass(true); setPassError(null); setPassOk(false); setNewPass('') }}
+          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors w-full mb-2"
+        >
+          <KeyRound size={13} /> Cambiar contraseña
+        </button>
+        <button
           onClick={signOut}
           className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors w-full"
         >
           <LogOut size={13} /> Cerrar sesión
         </button>
       </div>
+
+      {changingPass && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Cambiar contraseña</h2></div>
+            <div className="px-6 py-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Nueva contraseña</label>
+                <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/>
+              </div>
+              {passError && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{passError}</p>}
+              {passOk && <p className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2">Contraseña actualizada ✓</p>}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setChangingPass(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleChangePassword} disabled={passSaving || !newPass} className="px-4 py-2 text-sm bg-brand-red text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50">{passSaving ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 
