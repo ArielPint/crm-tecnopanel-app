@@ -135,11 +135,13 @@ export default function Dashboard() {
     avgDias[e] = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
   })
 
-  /* ── Actividad reciente: notificaciones + historial como fallback ── */
+  /* ── Actividad reciente: notificaciones + historial como fallback ──
+     Solo admin y gerente_ventas ven la actividad de todos; el resto, solo la propia. */
+  const veTodo = profile?.rol === 'admin' || profile?.rol === 'gerente_ventas'
   const actReciente = notifs.length >= 3 ? notifs : [
     ...notifs,
     ...hist
-      .filter(h => ['Ganado','Perdido'].includes(h.etapa) || true)
+      .filter(h => veTodo || h.usuario_id === profile?.id)
       .sort((a, b) => new Date(b.fecha_entrada).getTime() - new Date(a.fecha_entrada).getTime())
       .slice(0, 8 - notifs.length)
       .map(h => ({
