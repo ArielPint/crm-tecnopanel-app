@@ -85,6 +85,7 @@ export default function Usuarios() {
     setSaving(true); setError(null)
     try {
       const { data: { session } } = await supabase.auth.refreshSession()
+      if (!session) { await supabase.auth.signOut(); throw new Error('Tu sesión expiró, iniciá sesión de nuevo') }
       const res = await fetch(SUPABASE_URL + '/functions/v1/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
@@ -107,6 +108,7 @@ export default function Usuarios() {
     if (editing.nuevaPassword) {
       try {
         const { data: { session } } = await supabase.auth.refreshSession()
+        if (!session) { await supabase.auth.signOut(); throw new Error('Tu sesión expiró, iniciá sesión de nuevo') }
         const res = await fetch(SUPABASE_URL + '/functions/v1/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
