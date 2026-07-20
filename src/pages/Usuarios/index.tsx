@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, UserCheck, UserX, ChevronDown, ChevronUp, Shield } from 'lucide-react'
+import { Plus, Pencil, Check, X, UserCheck, UserX, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
@@ -72,6 +72,11 @@ export default function Usuarios() {
   const [form, setForm] = useState<ModalCreate>({ nombre:'', apellido:'', email:'', password:'', rol:'vendedor', modulos: DEFAULT_MODULOS.vendedor })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [roleLabels, setRoleLabels] = useState<Record<string, string>>({})
+  const [editingRol, setEditingRol] = useState<string | null>(null)
+  const [rolLabelDraft, setRolLabelDraft] = useState('')
+
+  function labelFor(rol: string) { return roleLabels[rol] ?? ROL_META[rol as Rol]?.label ?? rol }
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
@@ -79,7 +84,21 @@ export default function Usuarios() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  async function loadRoleLabels() {
+    const { data } = await supabase.from('role_labels').select('rol,label')
+    if (data) setRoleLabels(Object.fromEntries(data.map(r => [r.rol, r.label])))
+  }
+
+  async function saveRolLabel(rol: string) {
+    const label = rolLabelDraft.trim()
+    if (label) {
+      await supabase.from('role_labels').update({ label }).eq('rol', rol)
+      setRoleLabels(prev => ({ ...prev, [rol]: label }))
+    }
+    setEditingRol(null)
+  }
+
+  useEffect(() => { load(); loadRoleLabels() }, [])
 
   async function handleCreate() {
     setSaving(true); setError(null)
@@ -164,7 +183,7 @@ export default function Usuarios() {
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-800">{u.nombre} {u.apellido}</td>
                       <td className="px-4 py-3 text-gray-500">{u.email}</td>
-                      <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span></td>
+                      <td className="px-4 py-3"><span className={'text-xs px-2 py-1 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{labelFor(u.rol)}</span></td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {(u.modulos ?? []).length
@@ -196,7 +215,7 @@ export default function Usuarios() {
                     <p className="text-sm font-semibold text-gray-800 truncate">{u.nombre} {u.apellido}</p>
                     <p className="text-xs text-gray-400 truncate">{u.email}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={'text-[11px] px-2 py-0.5 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{meta?.label ?? u.rol}</span>
+                      <span className={'text-[11px] px-2 py-0.5 rounded-full font-medium ' + (meta?.badge ?? 'bg-gray-100 text-gray-600')}>{labelFor(u.rol)}</span>
                       {u.activo
                         ? <span className="flex items-center gap-0.5 text-green-600 text-[11px]"><UserCheck size={11}/>Activo</span>
                         : <span className="flex items-center gap-0.5 text-gray-400 text-[11px]"><UserX size={11}/>Inactivo</span>}
@@ -239,7 +258,24 @@ export default function Usuarios() {
                     return (
                       <tr key={rol} className="hover:bg-gray-50">
                         <td className="px-4 py-2.5">
-                          <span className={'text-xs px-2 py-1 rounded-full font-medium ' + meta.badge}>{meta.label}</span>
+                          {editingRol === rol ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                value={rolLabelDraft}
+                                onChange={e => setRolLabelDraft(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveRolLabel(rol); if (e.key === 'Escape') setEditingRol(null) }}
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1 w-36 focus:outline-none focus:ring-2 focus:ring-brand-red"
+                              />
+                              <button onClick={() => saveRolLabel(rol)} className="p-1 rounded hover:bg-green-50 text-green-600"><Check size={14}/></button>
+                              <button onClick={() => setEditingRol(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X size={14}/></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 group">
+                              <span className={'text-xs px-2 py-1 rounded-full font-medium ' + meta.badge}>{labelFor(rol)}</span>
+                              <button onClick={() => { setEditingRol(rol); setRolLabelDraft(labelFor(rol)) }} className="p-1 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100"><Pencil size={12}/></button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-gray-500">{meta.descripcion}</td>
                         <td className="px-4 py-2.5 text-center">
@@ -269,7 +305,7 @@ export default function Usuarios() {
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Contraseña temporal</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red"/></div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
                 <select value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value, modulos: DEFAULT_MODULOS[e.target.value] ?? [] }))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                  {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
+                  {Object.keys(ROL_META).map(r => <option key={r} value={r}>{labelFor(r)}</option>)}
                 </select>
                 <p className="text-[11px] text-gray-400 mt-1">Aplica el acceso por defecto del rol; podés ajustarlo abajo.</p>
               </div>
@@ -299,7 +335,7 @@ export default function Usuarios() {
               </div>
               <div><label className="text-xs font-medium text-gray-600 block mb-1">Rol</label>
                 <select value={editing.rol} onChange={e => setEditing(ed => ed ? { ...ed, rol: e.target.value } : null)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
-                  {Object.entries(ROL_META).map(([r, m]) => <option key={r} value={r}>{m.label}</option>)}
+                  {Object.keys(ROL_META).map(r => <option key={r} value={r}>{labelFor(r)}</option>)}
                 </select>
               </div>
               <div>
