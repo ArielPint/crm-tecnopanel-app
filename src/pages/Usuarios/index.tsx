@@ -18,16 +18,16 @@ const ROL_META: Record<string, { label: string; badge: string; descripcion: stri
   desarrollador:   { label:'Desarrollador',      badge:'bg-fuchsia-100 text-fuchsia-700', descripcion:'Entrega de planos y fichas en etapa Desarrollo' },
 }
 
-const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes','Usuarios']
+const MODULOS = ['Dashboard','Oportunidades','Ingeniería','Ganadas y Perdidas','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes','Usuarios']
 
 // Permisos de página que trae un rol por defecto al crearlo (el admin luego puede ajustar por usuario)
 const DEFAULT_MODULOS: Record<string, string[]> = {
   admin:           MODULOS,
-  gerente_general: ['Dashboard','Oportunidades','Ingeniería','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes'],
+  gerente_general: ['Dashboard','Oportunidades','Ingeniería','Ganadas y Perdidas','Desarrollo','Costos y Presupuestos','Negociación','Revisión Vendedor','Clientes'],
   gerente_ventas:  ['Dashboard','Oportunidades','Clientes','Revisión Vendedor'],
   vendedor:        ['Dashboard','Oportunidades','Clientes','Revisión Vendedor'],
-  jefe_ingenieria: ['Dashboard','Ingeniería','Desarrollo'],
-  ingeniero:       ['Dashboard','Ingeniería'],
+  jefe_ingenieria: ['Dashboard','Ingeniería','Ganadas y Perdidas','Desarrollo'],
+  ingeniero:       ['Dashboard','Ingeniería','Ganadas y Perdidas'],
   cubicador:       ['Dashboard','Costos y Presupuestos'],
   presupuestista:  ['Dashboard','Costos y Presupuestos','Negociación'],
   finanzas:        ['Dashboard','Negociación'],

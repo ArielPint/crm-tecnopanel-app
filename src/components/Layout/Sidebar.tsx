@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X, ClipboardCheck, KeyRound } from 'lucide-react'
+import { LayoutDashboard, Target, Compass, Hammer, Ruler, Landmark, Users, Building2, LogOut, ChevronRight, X, ClipboardCheck, KeyRound, Trophy } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePermisos } from '@/contexts/PermisosContext'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,7 @@ const MODULO_RUTA: Record<string, string> = {
   Dashboard: '/dashboard',
   Oportunidades: '/oportunidades',
   'Ingeniería': '/ingenieria',
+  'Ganadas y Perdidas': '/ganadas-perdidas',
   'Desarrollo': '/desarrollo',
   'Costos y Presupuestos': '/cubicacion',
   'Negociación': '/negociacion',
@@ -23,6 +24,7 @@ const MODULO_ICON: Record<string, React.ReactNode> = {
   Dashboard:    <LayoutDashboard size={16} />,
   Oportunidades:<Target size={16} />,
   'Ingeniería': <Compass size={16} />,
+  'Ganadas y Perdidas': <Trophy size={16} />,
   'Desarrollo': <Hammer size={16} />,
   'Costos y Presupuestos': <Ruler size={16} />,
   'Negociación': <Landmark size={16} />,
@@ -33,7 +35,7 @@ const MODULO_ICON: Record<string, React.ReactNode> = {
 
 const GRUPOS = [
   { label: 'Principal', modulos: ['Dashboard', 'Oportunidades'] },
-  { label: 'Módulos',   modulos: ['Ingeniería', 'Desarrollo', 'Costos y Presupuestos', 'Negociación', 'Revisión Vendedor'] },
+  { label: 'Módulos',   modulos: ['Ingeniería', 'Ganadas y Perdidas', 'Desarrollo', 'Costos y Presupuestos', 'Negociación', 'Revisión Vendedor'] },
   { label: 'Sistema',   modulos: ['Clientes', 'Usuarios'] },
 ]
 

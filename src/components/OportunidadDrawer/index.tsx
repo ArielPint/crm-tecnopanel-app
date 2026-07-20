@@ -122,7 +122,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const [historial, setHistorial] = useState<OportunidadHistorialEtapa[]>([])
   const [tareas, setTareas] = useState<TareaIngenieria[]>([])
   const [showCrearTarea, setShowCrearTarea] = useState(false)
-  const [nuevaTarea, setNuevaTarea] = useState({ titulo: '', descripcion: '', asignado_a: '', prioridad: '2', fecha_limite: '' })
+  const [nuevaTarea, setNuevaTarea] = useState({ titulo: '', descripcion: '', asignados_ids: [] as string[], prioridad: '2', fecha_limite: '' })
   const [creandoTarea, setCreandoTarea] = useState(false)
   const [mensajes, setMensajes] = useState<MensajeOportunidad[]>([])
   const [nuevoMensaje, setNuevoMensaje] = useState('')
@@ -161,7 +161,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       supabase.from('oportunidad_documentos').select('*').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
       supabase.from('oportunidad_historial_etapas').select('*,usuario:profiles(nombre,apellido)').eq('oportunidad_id', oportunidad.id).order('fecha_entrada', { ascending: false }),
       supabase.from('profiles').select('*').eq('activo', true).order('nombre'),
-      supabase.from('tareas_ingenieria').select('*,asignado:profiles(nombre,apellido)').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
+      supabase.from('tareas_ingenieria').select('*').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
       supabase.from('cierres').select('*').eq('oportunidad_id', oportunidad.id).maybeSingle(),
     ])
     setAsignadosIds(((asigRes.data as OportunidadAsignacion[]) ?? []).map(a => a.usuario_id))
@@ -169,7 +169,14 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     setDocs((docsRes.data as OportunidadDocumento[]) ?? [])
     setHistorial((histRes.data as OportunidadHistorialEtapa[]) ?? [])
     setUsuarios((usersRes.data as Profile[]) ?? [])
-    setTareas((tareasRes.data as TareaIngenieria[]) ?? [])
+    const tareasBase = (tareasRes.data as TareaIngenieria[]) ?? []
+    if (tareasBase.length) {
+      const { data: tareaAsigs } = await supabase.from('tarea_asignaciones').select('tarea_id,usuario:profiles(nombre,apellido)').in('tarea_id', tareasBase.map(t => t.id))
+      const byTarea: Record<string, Profile[]> = {}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(tareaAsigs ?? []).forEach((a: any) => { (byTarea[a.tarea_id] ??= []).push(a.usuario) })
+      setTareas(tareasBase.map(t => ({ ...t, asignados: byTarea[t.id] ?? [] })))
+    } else setTareas([])
     const c = cierreRes.data as Cierre | null
     setCierre(c)
     setOcForm({ numero_oc: c?.numero_oc ?? '', monto_oc: c?.monto_oc != null ? String(c.monto_oc) : '', fecha_oc: c?.fecha_oc ?? '' })
@@ -354,23 +361,26 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   async function crearTarea() {
     if (!nuevaTarea.titulo.trim()) return
     setCreandoTarea(true)
-    await supabase.from('tareas_ingenieria').insert({
+    const { data: tarea } = await supabase.from('tareas_ingenieria').insert({
       oportunidad_id: opp.id, titulo: nuevaTarea.titulo.trim(),
       descripcion: nuevaTarea.descripcion.trim() || null,
-      asignado_a: nuevaTarea.asignado_a || null,
       prioridad: Number(nuevaTarea.prioridad),
       fecha_limite: nuevaTarea.fecha_limite || null,
-    })
-    if (nuevaTarea.asignado_a) {
-      await supabase.from('notifications').insert({
-        user_id: nuevaTarea.asignado_a,
-        tipo: 'asignacion',
-        titulo: `Nueva tarea: ${nuevaTarea.titulo.trim()}`,
-        mensaje: `${opp.codigo} · ${opp.nombre}`,
-        oportunidad_id: opp.id,
-      })
+    }).select('id').single()
+    if (tarea && nuevaTarea.asignados_ids.length) {
+      await supabase.from('tarea_asignaciones').insert(
+        nuevaTarea.asignados_ids.map(usuario_id => ({ tarea_id: tarea.id, usuario_id, asignado_por: profile?.id }))
+      )
+      await supabase.from('notifications').insert(
+        nuevaTarea.asignados_ids.map(user_id => ({
+          user_id, tipo: 'asignacion',
+          titulo: `Nueva tarea: ${nuevaTarea.titulo.trim()}`,
+          mensaje: `${opp.codigo} · ${opp.nombre}`,
+          oportunidad_id: opp.id,
+        }))
+      )
     }
-    setNuevaTarea({ titulo: '', descripcion: '', asignado_a: '', prioridad: '2', fecha_limite: '' })
+    setNuevaTarea({ titulo: '', descripcion: '', asignados_ids: [], prioridad: '2', fecha_limite: '' })
     setShowCrearTarea(false); setCreandoTarea(false)
     await loadAll()
   }
@@ -538,7 +548,8 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const allowedRoles = STAGE_ROLES[opp.etapa_actual] ?? []
   const filteredUsers = usuarios.filter(u => allowedRoles.includes(u.rol))
   // Mismo control de rol para Avanzar y Retroceder: ambas son acciones de gestión de la etapa actual.
-  const canManageStage = !profile?.rol || allowedRoles.length === 0 || allowedRoles.includes(profile.rol)
+  // gerente_ventas gestiona el pipeline completo, sin restricción de etapa (igual que admin).
+  const canManageStage = !profile?.rol || profile.rol === 'gerente_ventas' || allowedRoles.length === 0 || allowedRoles.includes(profile.rol)
   const canGoBack = currentIdx > 0 && !isTerminal
 
   function renderEtapaForm() {
@@ -881,13 +892,21 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                     <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                       <input value={nuevaTarea.titulo} onChange={e => setNuevaTarea(t=>({...t,titulo:e.target.value}))} placeholder="Título *" className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
                       <textarea value={nuevaTarea.descripcion} onChange={e => setNuevaTarea(t=>({...t,descripcion:e.target.value}))} placeholder="Descripción" rows={2} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs resize-none" />
-                      <div className="grid grid-cols-2 gap-2">
-                        <select value={nuevaTarea.asignado_a} onChange={e => setNuevaTarea(t=>({...t,asignado_a:e.target.value}))} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs">
-                          <option value="">Sin asignar</option>
-                          {filteredUsers.map(u => <option key={u.id} value={u.id}>{u.nombre} {u.apellido}</option>)}
-                        </select>
-                        <input type="date" value={nuevaTarea.fecha_limite} onChange={e => setNuevaTarea(t=>({...t,fecha_limite:e.target.value}))} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Asignar a (múltiples ingenieros)</label>
+                        <div className="space-y-1 max-h-28 overflow-y-auto border border-gray-200 rounded p-1.5">
+                          {filteredUsers.length === 0 ? <p className="text-xs text-gray-400 px-1">Sin usuarios disponibles</p> :
+                          filteredUsers.map(u => (
+                            <label key={u.id} className="flex items-center gap-1.5 text-xs text-gray-600 px-1 py-0.5">
+                              <input type="checkbox" checked={nuevaTarea.asignados_ids.includes(u.id)}
+                                onChange={() => setNuevaTarea(t => ({ ...t, asignados_ids: t.asignados_ids.includes(u.id) ? t.asignados_ids.filter(id=>id!==u.id) : [...t.asignados_ids, u.id] }))}
+                                className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                              {u.nombre} {u.apellido}
+                            </label>
+                          ))}
+                        </div>
                       </div>
+                      <input type="date" value={nuevaTarea.fecha_limite} onChange={e => setNuevaTarea(t=>({...t,fecha_limite:e.target.value}))} className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs" />
                       <button onClick={crearTarea} disabled={creandoTarea} className="px-3 py-1 text-xs text-white rounded disabled:opacity-60" style={{background:'#ed3224'}}>
                         {creandoTarea ? 'Creando...' : 'Crear'}
                       </button>
@@ -899,7 +918,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                         <div key={t.id} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-lg">
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-gray-700 truncate">{t.titulo}</p>
-                            <p className="text-xs text-gray-400">{t.asignado ? `${(t.asignado as Profile).nombre} ${(t.asignado as Profile).apellido}` : 'Sin asignar'}{t.fecha_limite ? ' · vence ' + new Date(t.fecha_limite).toLocaleDateString('es-CL') : ''}</p>
+                            <p className="text-xs text-gray-400">{t.asignados?.length ? t.asignados.map(a=>`${a.nombre} ${a.apellido}`).join(', ') : 'Sin asignar'}{t.fecha_limite ? ' · vence ' + new Date(t.fecha_limite).toLocaleDateString('es-CL') : ''}</p>
                           </div>
                           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">{t.estado.replace(/_/g,' ')}</span>
                         </div>

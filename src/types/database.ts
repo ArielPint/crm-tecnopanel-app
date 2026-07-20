@@ -18,6 +18,7 @@ export interface Profile {
   rol: RolUsuario
   activo: boolean
   modulos: string[]
+  must_change_password: boolean
   avatar_url: string | null
   created_at: string
   updated_at: string
@@ -155,12 +156,20 @@ export interface TareaIngenieria {
   oportunidad_id: string
   titulo: string
   descripcion: string | null
-  asignado_a: string | null
   estado: EstadoTarea
   prioridad: number
   fecha_limite: string | null
   created_at: string
-  asignado?: Profile
+  asignados?: Profile[]
+}
+
+export interface TareaAsignacion {
+  id: string
+  tarea_id: string
+  usuario_id: string
+  asignado_por: string | null
+  created_at: string
+  usuario?: Profile
 }
 
 export type Database = {
@@ -170,6 +179,7 @@ export type Database = {
       clientes: { Row: Cliente }
       oportunidades: { Row: Oportunidad }
       tareas_ingenieria: { Row: TareaIngenieria }
+      tarea_asignaciones: { Row: TareaAsignacion }
       oportunidad_historial_etapas: { Row: OportunidadHistorialEtapa }
       oportunidad_asignaciones: { Row: OportunidadAsignacion }
       oportunidad_documentos: { Row: OportunidadDocumento }
