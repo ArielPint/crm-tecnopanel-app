@@ -55,6 +55,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
   async function handleChangePassword() {
     if (newPass.length < 6) { setPassError('Mínimo 6 caracteres'); return }
     setPassSaving(true); setPassError(null)
+    await supabase.auth.refreshSession()
     const { error } = await supabase.auth.updateUser({ password: newPass })
     if (error) setPassError(error.message)
     else { setPassOk(true); setNewPass(''); setTimeout(() => { setChangingPass(false); setPassOk(false) }, 1200) }
