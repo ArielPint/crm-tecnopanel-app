@@ -66,6 +66,7 @@ export interface Oportunidad {
   duracion_meses_est: number | null
   familia_productos: string[] | null
   alcances: string[] | null
+  margen_porcentaje: number | null
   created_at: string
   updated_at: string
   cliente?: Cliente

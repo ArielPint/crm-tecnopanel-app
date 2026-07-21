@@ -388,6 +388,11 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     await loadAll()
   }
 
+  async function saveMargen(value: number | null) {
+    setOpp(o => ({ ...o, margen_porcentaje: value }))
+    await supabase.from('oportunidades').update({ margen_porcentaje: value }).eq('id', opp.id)
+  }
+
   async function saveGeneral() {
     setSaving(true)
     await supabase.from('oportunidades').update({
@@ -671,7 +676,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cubicación manual (si no aplica Excel)</p>
         {field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones cubicación','')}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Presupuesto manual</p>
-        {field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('margen_porcentaje','Margen (%)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}
+        {field('costo_materiales','Costo materiales (CLP)','number','0')}{field('costo_mano_obra','Mano de obra (CLP)','number','0')}{field('costo_transporte','Transporte (CLP)','number','0')}{field('precio_final','Precio final (CLP)','number','0')}{ta('notas_presupuesto','Notas','Condiciones, exclusiones...')}
       </div>
       )
     }
@@ -700,6 +705,12 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     }
     if (e === 'Negociación') return (
       <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Margen (%)</label>
+          <input type="number" defaultValue={opp.margen_porcentaje ?? ''}
+            onBlur={ev => { const v = ev.target.value ? Number(ev.target.value) : null; if (v !== opp.margen_porcentaje) saveMargen(v) }}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+        </div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revisión del cliente</p>
         {ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Evaluación crediticia</p>
