@@ -118,6 +118,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
   const [usuarios, setUsuarios] = useState<Profile[]>([])
   const [asignadosIds, setAsignadosIds] = useState<string[]>([])
   const [etapaData, setEtapaData] = useState<Record<string, string>>({})
+  const [costosData, setCostosData] = useState<Record<string, string>>({})
   const [docs, setDocs] = useState<OportunidadDocumento[]>([])
   const [historial, setHistorial] = useState<OportunidadHistorialEtapa[]>([])
   const [tareas, setTareas] = useState<TareaIngenieria[]>([])
@@ -155,9 +156,10 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
 
   async function loadAll() {
     setLoading(true)
-    const [asigRes, etapaRes, docsRes, histRes, usersRes, tareasRes, cierreRes] = await Promise.all([
+    const [asigRes, etapaRes, costosRes, docsRes, histRes, usersRes, tareasRes, cierreRes] = await Promise.all([
       supabase.from('oportunidad_asignaciones').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', oportunidad.etapa_actual),
       supabase.from('oportunidad_datos_etapa').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', oportunidad.etapa_actual).maybeSingle(),
+      supabase.from('oportunidad_datos_etapa').select('*').eq('oportunidad_id', oportunidad.id).eq('etapa', 'Costos y Presupuestos').maybeSingle(),
       supabase.from('oportunidad_documentos').select('*').eq('oportunidad_id', oportunidad.id).order('created_at', { ascending: false }),
       supabase.from('oportunidad_historial_etapas').select('*,usuario:profiles(nombre,apellido)').eq('oportunidad_id', oportunidad.id).order('fecha_entrada', { ascending: false }),
       supabase.from('profiles').select('*').eq('activo', true).order('nombre'),
@@ -166,6 +168,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     ])
     setAsignadosIds(((asigRes.data as OportunidadAsignacion[]) ?? []).map(a => a.usuario_id))
     setEtapaData(((etapaRes.data as {datos?:Record<string,string>}|null)?.datos) ?? {})
+    setCostosData(((costosRes.data as {datos?:Record<string,string>}|null)?.datos) ?? {})
     setDocs((docsRes.data as OportunidadDocumento[]) ?? [])
     setHistorial((histRes.data as OportunidadHistorialEtapa[]) ?? [])
     setUsuarios((usersRes.data as Profile[]) ?? [])
@@ -220,17 +223,17 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
 
   async function generarPresupuestoPdf() {
     let items: CubicacionItem[] = []
-    try { items = JSON.parse(etapaData['cubicacion_items_json'] || '[]') } catch { items = [] }
-    if (items.length === 0) { setExcelError('Sube primero el Excel de cubicación.'); return }
+    try { items = JSON.parse(costosData['cubicacion_items_json'] || '[]') } catch { items = [] }
+    if (items.length === 0) return
     setGenerandoPdf(true); setPresupuestoPdfUrl('')
-    const costoCerchas = Number(etapaData['costo_cerchas'] || 0)
-    const costoFlete = Number(etapaData['costo_flete'] || 0)
+    const costoCerchas = Number(costosData['costo_cerchas'] || 0)
+    const costoFlete = Number(costosData['costo_flete'] || 0)
     const costoItemsTotal = items.reduce((s, i) => s + i.costo_total, 0)
     const costoTotalInterno = costoItemsTotal + costoCerchas + costoFlete
-    const montoNetoCliente = Number(etapaData['monto_neto_cliente'] || 0)
+    const montoNetoCliente = Number(costosData['monto_neto_cliente'] || 0)
     const factor = costoTotalInterno > 0 && montoNetoCliente > 0 ? montoNetoCliente / costoTotalInterno : 1
-    const proyecto = etapaData['cubicacion_proyecto'] || opp.nombre
-    const clienteNombre = (opp.cliente as { razon_social?: string } | undefined)?.razon_social || etapaData['cubicacion_cliente'] || ''
+    const proyecto = costosData['cubicacion_proyecto'] || opp.nombre
+    const clienteNombre = (opp.cliente as { razon_social?: string } | undefined)?.razon_social || costosData['cubicacion_cliente'] || ''
 
     const doc = new jsPDF()
     try {
@@ -246,7 +249,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     doc.text(clienteNombre.toUpperCase(), 15, 55)
     doc.setFont('helvetica', 'normal')
     doc.text(`REF: PRESUPUESTO ${String(proyecto).toUpperCase()}`, 15, 65)
-    doc.text(doc.splitTextToSize(etapaData['condiciones_tecnicas'] || CONDICIONES_TECNICAS_DEFAULT, 180), 15, 78)
+    doc.text(doc.splitTextToSize(costosData['condiciones_tecnicas'] || CONDICIONES_TECNICAS_DEFAULT, 180), 15, 78)
 
     doc.addPage()
     let y = 20
@@ -663,16 +666,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
             onChange={ev => setEtapaData(d => ({ ...d, condiciones_tecnicas: ev.target.value }))} rows={5}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" />
         </div>
-        <button onClick={generarPresupuestoPdf} disabled={generandoPdf || cubicacionItems.length === 0}
-          className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
-          {generandoPdf && <Loader2 size={14} className="animate-spin" />}{generandoPdf ? 'Generando...' : 'Generar Presupuesto PDF'}
-        </button>
-        {presupuestoPdfUrl && (
-          <a href={presupuestoPdfUrl} target="_blank" rel="noreferrer" download={`Presupuesto ${opp.codigo}.pdf`}
-            className="w-full py-2 border border-green-200 bg-green-50 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-green-100">
-            <FileText size={14} /> PDF generado — Descargar
-          </a>
-        )}
+        <p className="text-xs text-gray-400">El PDF se genera en la etapa Revisión Vendedor, luego de revisar toda la información.</p>
 
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cubicación manual (si no aplica Excel)</p>
         {field('acero_kg','Acero estructural (kg)','number','0')}{field('paneles_m2','Paneles (m²)','number','0')}{field('cubierta_m2','Cubierta (m²)','number','0')}{field('pilares_und','Pilares (und)','number','0')}{ta('lista_materiales','Materiales adicionales','Otros componentes...')}{ta('observaciones','Observaciones cubicación','')}
@@ -681,7 +675,29 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       </div>
       )
     }
-    if (e === 'Revisión Vendedor') return <div className="space-y-3">{field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}</div>
+    if (e === 'Revisión Vendedor') {
+      let costosItems: CubicacionItem[] = []
+      try { costosItems = JSON.parse(costosData['cubicacion_items_json'] || '[]') } catch { costosItems = [] }
+      return (
+        <div className="space-y-3">
+          {field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}
+          <div className="pt-3 border-t border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2">Presupuesto final</p>
+            <button onClick={generarPresupuestoPdf} disabled={generandoPdf || costosItems.length === 0}
+              className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
+              {generandoPdf && <Loader2 size={14} className="animate-spin" />}{generandoPdf ? 'Generando...' : 'Generar Presupuesto PDF'}
+            </button>
+            {costosItems.length === 0 && <p className="text-xs text-gray-400 mt-1">Falta la cubicación cargada en Costos y Presupuestos.</p>}
+            {presupuestoPdfUrl && (
+              <a href={presupuestoPdfUrl} target="_blank" rel="noreferrer" download={`Presupuesto ${opp.codigo}.pdf`}
+                className="w-full py-2 border border-green-200 bg-green-50 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-green-100 mt-2">
+                <FileText size={14} /> PDF generado — Descargar
+              </a>
+            )}
+          </div>
+        </div>
+      )
+    }
     if (e === 'Negociación') return (
       <div className="space-y-3">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revisión del cliente</p>
