@@ -861,7 +861,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           ) : tab === 'etapa' ? (
             <div className="space-y-4">
               {renderEtapaForm()}
-              {opp.etapa_actual !== 'Clasificación' && (
+              {opp.etapa_actual !== 'Clasificación' && opp.etapa_actual !== 'Ingeniería' && (
                 <button onClick={saveEtapaData} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
                   {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar datos de etapa'}
                 </button>
@@ -923,6 +923,9 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                       ))}
                     </div>
                   )}
+                  <button onClick={saveEtapaData} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
+                    {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar datos de etapa'}
+                  </button>
                 </div>
               )}
             </div>
