@@ -256,7 +256,7 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Cierre estimado</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Fecha de presentación</label>
               <input type="date" value={form.fecha_cierre_est} onChange={e => setForm(f=>({...f,fecha_cierre_est:e.target.value}))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
             </div>

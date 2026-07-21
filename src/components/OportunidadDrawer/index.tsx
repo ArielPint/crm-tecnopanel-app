@@ -568,15 +568,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red resize-none" />
       </div>
     )
-    if (e === 'Ingeniería') return (
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">{field('superficie_total','Superficie total (m²)','number','0')}{field('altura_libre','Altura libre (m)','number','0')}</div>
-        <div className="grid grid-cols-2 gap-3">{field('largo','Largo (m)','number','0')}{field('ancho','Ancho (m)','number','0')}</div>
-        {ta('descripcion_estructura','Descripcion de estructura','Tipo de estructura, caracteristicas, uso previsto...')}
-        <div className="grid grid-cols-3 gap-3">{field('carga_viento','Viento (km/h)','number','0')}{field('carga_nieve','Nieve (kg/m²)','number','0')}{field('zona_sismica','Zona sismica','text','Z1, Z2...')}</div>
-        {ta('observaciones_tecnicas','Observaciones tecnicas','Notas de ingenieria, restricciones...')}
+    if (e === 'Clasificación') return (
+      <div className="text-center py-6">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Etapa actual</p>
+        <p className="text-lg font-bold text-gray-700">Clasificación</p>
       </div>
     )
+    if (e === 'Ingeniería') return null
     if (e === 'Desarrollo') return (
       <div className="space-y-3">
         <div>
@@ -785,7 +783,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                     <option value="Producto">{TIPO_VENTA_LABELS.Producto}</option>
                     <option value="Kit">{TIPO_VENTA_LABELS.Kit}</option>
                   </select></div>
-                <div><label className="block text-xs font-medium text-gray-600 mb-1">Cierre estimado</label>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha de presentación</label>
                   <input type="date" value={opp.fecha_cierre_est ?? ''} onChange={e => setOpp(o => ({...o,fecha_cierre_est:e.target.value||null}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -856,19 +854,6 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
                   ))}
                 </div></div>
 
-              {opp.etapa_actual !== 'Clasificación' && (
-                <div><label className="block text-xs font-medium text-gray-600 mb-1.5">Asignados (etapa actual)</label>
-                  <div className="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                    {filteredUsers.length === 0 ? <p className="text-xs text-gray-400 px-1">Sin usuarios disponibles para este rol</p> :
-                    filteredUsers.map(u => (
-                      <label key={u.id} className="flex items-center gap-2 text-sm text-gray-600 px-1 py-0.5">
-                        <input type="checkbox" checked={asignadosIds.includes(u.id)} onChange={() => toggleAsignado(u.id)}
-                          className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
-                        {u.nombre} {u.apellido} <span className="text-xs text-gray-400">({u.rol.replace(/_/g,' ')})</span>
-                      </label>
-                    ))}
-                  </div></div>
-              )}
               <button onClick={saveGeneral} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
                 {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar cambios'}
               </button>
@@ -876,12 +861,25 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
           ) : tab === 'etapa' ? (
             <div className="space-y-4">
               {renderEtapaForm()}
-              <button onClick={saveEtapaData} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
-                {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar datos de etapa'}
-              </button>
+              {opp.etapa_actual !== 'Clasificación' && (
+                <button onClick={saveEtapaData} disabled={saving} className="w-full py-2 text-white rounded-lg text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2" style={{background:'#ed3224'}}>
+                  {saving && <Loader2 size={14} className="animate-spin" />}{saving ? 'Guardando...' : 'Guardar datos de etapa'}
+                </button>
+              )}
 
               {opp.etapa_actual === 'Ingeniería' && (
                 <div className="pt-4 border-t border-gray-200 space-y-3">
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1.5">Asignados (etapa actual)</label>
+                    <div className="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                      {filteredUsers.length === 0 ? <p className="text-xs text-gray-400 px-1">Sin usuarios disponibles para este rol</p> :
+                      filteredUsers.map(u => (
+                        <label key={u.id} className="flex items-center gap-2 text-sm text-gray-600 px-1 py-0.5">
+                          <input type="checkbox" checked={asignadosIds.includes(u.id)} onChange={() => toggleAsignado(u.id)}
+                            className="rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                          {u.nombre} {u.apellido} <span className="text-xs text-gray-400">({u.rol.replace(/_/g,' ')})</span>
+                        </label>
+                      ))}
+                    </div></div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tareas de ingeniería</p>
                     <button onClick={() => setShowCrearTarea(s => !s)} className="flex items-center gap-1 text-xs font-medium text-brand-red hover:underline">
@@ -1020,8 +1018,12 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
               {saving ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} />}
               {saving ? 'Avanzando...' : 'Avanzar a ' + nextEtapa}
             </button>
-            <button onClick={() => marcarEstado('Ganado')} disabled={saving} className="px-3 py-2 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">Ganado</button>
-            <button onClick={() => marcarEstado('Perdido')} disabled={saving} className="px-3 py-2 text-xs font-medium bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-60">Perdido</button>
+            {opp.etapa_actual !== 'Ingeniería' && (
+              <>
+                <button onClick={() => marcarEstado('Ganado')} disabled={saving} className="px-3 py-2 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">Ganado</button>
+                <button onClick={() => marcarEstado('Perdido')} disabled={saving} className="px-3 py-2 text-xs font-medium bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-60">Perdido</button>
+              </>
+            )}
           </div>
         )}
       </div>
