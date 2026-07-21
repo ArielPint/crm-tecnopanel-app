@@ -760,7 +760,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 flex-shrink-0">
-          {([['general','General'],['etapa', isTerminal ? 'Datos' : (opp.etapa_actual === 'Clasificación' ? 'Información adicional' : opp.etapa_actual)],['docs','Docs ('+docs.length+')'],['chat','Chat'],['historial','Historial']] as [Tab,string][]).map(([k,label]) => (
+          {([['general','General'],['etapa', isTerminal ? 'Datos' : opp.etapa_actual],['docs','Docs ('+docs.length+')'],['chat','Chat'],['historial','Historial']] as [Tab,string][]).map(([k,label]) => (
             <button key={k} onClick={() => setTab(k)}
               className={['flex-1 text-xs font-medium py-2.5 border-b-2 transition-colors truncate px-1', tab===k ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'].join(' ')}>
               {label}
