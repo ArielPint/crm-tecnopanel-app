@@ -48,7 +48,7 @@ const REGIONES = Object.keys(REGIONES_COMUNAS)
 
 interface FormData {
   nombre: string; cliente_id: string; tipo_venta: TipoVenta;
-  monto_estimado: string; probabilidad: string; margen_porcentaje: string;
+  monto_estimado: string; probabilidad: string;
   fecha_cierre_est: string; descripcion: string;
   nombre_entidad_patrocinante: string;
   region: string; comuna: string;
@@ -60,7 +60,7 @@ interface FormData {
 }
 const INIT: FormData = {
   nombre:'', cliente_id:'', tipo_venta:'Proyecto',
-  monto_estimado:'', probabilidad:'50', margen_porcentaje:'',
+  monto_estimado:'', probabilidad:'50',
   fecha_cierre_est:'', descripcion:'',
   nombre_entidad_patrocinante:'',
   region:'', comuna:'',
@@ -154,7 +154,6 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
       duracion_meses_est: form.duracion_meses_est ? Number(form.duracion_meses_est) : null,
       familia_productos: form.familia_productos.length ? form.familia_productos : null,
       alcances: form.alcances.length ? form.alcances : null,
-      margen_porcentaje: form.margen_porcentaje ? Number(form.margen_porcentaje) : null,
     }).select('id').single()
     if (err) { setError(err.message); setSaving(false); return }
     const oportunidadId = (data as { id: string })?.id ?? null
@@ -261,12 +260,6 @@ export default function NuevaOportunidadModal({ isOpen, onClose, onSuccess }: Pr
               <input type="date" value={form.fecha_cierre_est} onChange={e => setForm(f=>({...f,fecha_cierre_est:e.target.value}))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Margen (%)</label>
-            <input type="number" value={form.margen_porcentaje} onChange={e => setForm(f=>({...f,margen_porcentaje:e.target.value}))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
