@@ -685,7 +685,13 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
       try { costosItems = JSON.parse(costosData['cubicacion_items_json'] || '[]') } catch { costosItems = [] }
       return (
         <div className="space-y-3">
-          {field('descuento_porcentaje','Descuento (%)','number','0')}{field('plazo_entrega_dias','Plazo entrega (dias)','number','0')}{ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Margen (%)</label>
+            <input type="number" defaultValue={opp.margen_porcentaje ?? ''}
+              onBlur={ev => { const v = ev.target.value ? Number(ev.target.value) : null; if (v !== opp.margen_porcentaje) saveMargen(v) }}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+          </div>
+          {ta('condiciones_comerciales','Condiciones comerciales','Formas de pago, garantias...')}{ta('notas_revision','Notas del vendedor','')}
           <div className="pt-3 border-t border-gray-200">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2">Presupuesto final</p>
             <button onClick={generarPresupuestoPdf} disabled={generandoPdf || costosItems.length === 0}
@@ -705,16 +711,20 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
     }
     if (e === 'Negociación') return (
       <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Margen (%)</label>
-          <input type="number" defaultValue={opp.margen_porcentaje ?? ''}
-            onBlur={ev => { const v = ev.target.value ? Number(ev.target.value) : null; if (v !== opp.margen_porcentaje) saveMargen(v) }}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" />
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <p className="text-xs font-medium text-amber-800">Recuerda adjuntar el programa de despachos.</p>
         </div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revisión del cliente</p>
-        {ta('feedback_cliente','Feedback del cliente','Observaciones, cambios solicitados...')}{field('modificaciones_solicitadas','Modificaciones','text','Resumen de cambios')}{ta('acuerdos','Acuerdos alcanzados','')}
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Evaluación crediticia</p>
-        {field('limite_credito','Limite de credito (CLP)','number','0')}{field('plazo_pago_dias','Plazo de pago (dias)','number','0')}{field('resultado','Resultado','text','Aprobado / Rechazado')}{ta('condiciones_credito','Condiciones','Garantias, avales...')}{ta('observaciones_finanzas','Observaciones','')}
+
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Necesita Piloto</label>
+          <select value={etapaData['necesita_piloto'] ?? ''} onChange={ev => setEtapaData(d => ({...d, necesita_piloto: ev.target.value}))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red">
+            <option value="">Seleccionar...</option>
+            <option value="Si">Si</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">Cierre</p>
         {ta('motivo_perdida','Motivo de pérdida (si aplica)','Solo relevante si la oportunidad se marca como Perdido')}
 
@@ -730,7 +740,7 @@ export default function OportunidadDrawer({ oportunidad, onClose, onUpdate }: Pr
             <div><label className="block text-xs font-medium text-gray-600 mb-1">Número OC</label>
               <input value={ocForm.numero_oc} onChange={ev => setOcForm(f => ({...f, numero_oc: ev.target.value}))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha OC</label>
+            <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha Inicio despachos masivos</label>
               <input type="date" value={ocForm.fecha_oc} onChange={ev => setOcForm(f => ({...f, fecha_oc: ev.target.value}))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-red" /></div>
           </div>

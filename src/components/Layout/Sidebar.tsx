@@ -34,8 +34,8 @@ const MODULO_ICON: Record<string, React.ReactNode> = {
 }
 
 const GRUPOS = [
-  { label: 'Principal', modulos: ['Dashboard', 'Oportunidades'] },
-  { label: 'Módulos',   modulos: ['Ingeniería', 'Ganadas y Perdidas', 'Desarrollo', 'Costos y Presupuestos', 'Negociación', 'Revisión Vendedor'] },
+  { label: 'Principal', modulos: ['Dashboard', 'Ganadas y Perdidas', 'Oportunidades'] },
+  { label: 'Módulos',   modulos: ['Ingeniería', 'Desarrollo', 'Costos y Presupuestos', 'Revisión Vendedor', 'Negociación'] },
   { label: 'Sistema',   modulos: ['Clientes', 'Usuarios'] },
 ]
 
